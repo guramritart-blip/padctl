@@ -51,8 +51,11 @@ if [ "$PADCTL" != "$SRC" ]; then
   # inherit someone else's bindings, half of which reference tools you may
   # not have.
   for f in padctl.js mousehelper.swift package.json package-lock.json \
-           com.g.padctl.plist.template config.example.json README.md; do
+           com.g.padctl.plist.template config.example.json README.md LICENSE; do
     [ -f "$SRC/$f" ] && cp "$SRC/$f" "$PADCTL/$f"
+  done
+  for d in lib ui scripts; do
+    [ -d "$SRC/$d" ] && { rm -rf "${PADCTL:?}/$d"; cp -R "$SRC/$d" "$PADCTL/$d"; }
   done
 fi
 
@@ -99,9 +102,15 @@ sleep 1
 swiftc -O -o "$PADCTL/mousehelper" "$PADCTL/mousehelper.swift"
 
 # ---------------------------------------------------------------- config
+# Built for this machine rather than copied: it reads your real screenshot,
+# spaces and Mission Control shortcuts out of your own settings, and only binds
+# apps it can actually find. Falls back to the example if anything goes wrong.
 if [ ! -f "$PADCTL/config.json" ]; then
-  cp "$PADCTL/config.example.json" "$PADCTL/config.json"
-  say "Started you on config.example.json"
+  say "Building a config for this machine"
+  if ! "$PADCTL/bin/node" "$PADCTL/scripts/init-config.js"; then
+    cp "$PADCTL/config.example.json" "$PADCTL/config.json"
+    echo "  fell back to config.example.json"
+  fi
 fi
 
 # ---------------------------------------------------------------- launch agent

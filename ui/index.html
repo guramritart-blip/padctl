@@ -1,0 +1,578 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>padctl</title>
+<style>
+  :root {
+    --ink: #06110f; --ink-2: #0b1a17; --ink-3: #0f2320; --line: #16302b;
+    --fog: #7e9a93; --fog-dim: #55706a; --chalk: #e6efea;
+    --amber: #ff9a3c; --red: #ff6b5a; --green: #4bd6a8;
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
+    --body: ui-sans-serif, system-ui, -apple-system, "Helvetica Neue", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--ink); color: var(--chalk);
+    font-family: var(--body); font-size: 15px; line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 74rem; margin: 0 auto; padding: 1.5rem clamp(1rem, 3vw, 2.5rem) 4rem; }
+
+  header { display: flex; align-items: baseline; gap: 1rem; flex-wrap: wrap;
+           border-bottom: 1px solid var(--line); padding-bottom: 1rem; margin-bottom: 1.5rem; }
+  .mark { font-family: var(--mono); letter-spacing: 0.3em; text-transform: uppercase; font-size: 0.85rem; }
+  .status { font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.1em;
+            text-transform: uppercase; color: var(--fog-dim); margin-left: auto; display: flex; gap: 1rem; }
+  .dot { color: var(--red); }
+  .dot.live { color: var(--green); }
+
+  .cols { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 2rem; align-items: start; }
+  @media (max-width: 900px) { .cols { grid-template-columns: 1fr; } }
+
+  .tabs { display: flex; gap: 0; border: 1px solid var(--line); width: fit-content; margin-bottom: 1rem; }
+  .tabs button {
+    font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase;
+    background: transparent; border: 0; border-right: 1px solid var(--line);
+    color: var(--fog); padding: 0.55rem 0.9rem; cursor: pointer;
+  }
+  .tabs button:last-child { border-right: 0; }
+  .tabs button[aria-selected="true"] { background: var(--amber); color: var(--ink); }
+  .tabs button:focus-visible { outline: 2px solid var(--chalk); outline-offset: -3px; }
+
+  svg.pad { width: 100%; height: auto; display: block; }
+  .ctl { cursor: pointer; }
+  .ctl:focus { outline: none; }
+  .ctl .hit { fill: transparent; }
+  .ctl .shape { fill: none; stroke: var(--fog-dim); stroke-width: 2; transition: stroke .12s, fill .12s; }
+  .ctl .glyph { fill: var(--fog-dim); font-family: var(--mono); font-size: 11px; transition: fill .12s; }
+  .ctl.bound .shape { stroke: var(--fog); }
+  .ctl.bound .glyph { fill: var(--fog); }
+  .ctl:hover .shape, .ctl.sel .shape { stroke: var(--amber); }
+  .ctl:hover .glyph, .ctl.sel .glyph { fill: var(--amber); }
+  .ctl.sel .shape { fill: rgba(255,154,60,.13); }
+  .ctl.down .shape { stroke: var(--green); fill: rgba(75,214,168,.18); }
+  .ctl.down .glyph { fill: var(--green); }
+  .shell { fill: var(--ink-2); stroke: var(--line); stroke-width: 2; }
+
+  .panel { border: 1px solid var(--line); background: var(--ink-2); padding: 1.1rem; }
+  .panel + .panel { margin-top: 1rem; }
+  .panel h2 { font-size: 0.72rem; font-family: var(--mono); letter-spacing: 0.18em;
+              text-transform: uppercase; color: var(--fog-dim); margin: 0 0 0.85rem; font-weight: 400; }
+
+  .selname { font-size: 1.35rem; margin: 0 0 0.15rem; }
+  .selid { font-family: var(--mono); font-size: 0.75rem; color: var(--fog-dim); margin: 0 0 1rem; }
+
+  label { display: block; font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.14em;
+          text-transform: uppercase; color: var(--fog-dim); margin: 0 0 0.35rem; }
+  .field { margin-bottom: 0.9rem; }
+  select, input[type="text"], textarea {
+    width: 100%; background: var(--ink); color: var(--chalk); border: 1px solid var(--line);
+    font-family: var(--mono); font-size: 0.82rem; padding: 0.5rem 0.6rem; border-radius: 0;
+  }
+  textarea { min-height: 5rem; resize: vertical; line-height: 1.5; }
+  select:focus, input:focus, textarea:focus { outline: 1px solid var(--amber); border-color: var(--amber); }
+
+  .capture {
+    width: 100%; text-align: left; background: var(--ink); border: 1px dashed var(--line);
+    color: var(--chalk); font-family: var(--mono); font-size: 0.85rem; padding: 0.7rem;
+    cursor: pointer;
+  }
+  .capture.arm { border-color: var(--amber); border-style: solid; color: var(--amber); }
+  .capture:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+
+  .row { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+  button.act {
+    font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.12em; text-transform: uppercase;
+    border: 1px solid var(--line); background: transparent; color: var(--chalk);
+    padding: 0.55rem 0.9rem; cursor: pointer;
+  }
+  button.act:hover { border-color: var(--amber); color: var(--amber); }
+  button.act.primary { background: var(--amber); color: var(--ink); border-color: var(--amber); }
+  button.act.primary:hover { background: #ffb066; color: var(--ink); }
+  button.act:disabled { opacity: 0.4; cursor: default; }
+  button.act:focus-visible { outline: 2px solid var(--chalk); outline-offset: 2px; }
+
+  .note { display: grid; grid-template-columns: auto 1fr; gap: 0.6rem; font-size: 0.85rem;
+          color: var(--fog); padding: 0.45rem 0; border-bottom: 1px solid var(--line); }
+  .note:last-child { border-bottom: 0; }
+  .note b { color: var(--chalk); font-weight: 500; font-family: var(--mono); font-size: 0.78rem; }
+
+  .kv { display: flex; gap: 0.6rem; font-size: 0.85rem; padding: 0.3rem 0; }
+  .kv span:first-child { color: var(--fog-dim); min-width: 7rem; font-family: var(--mono); font-size: 0.72rem;
+                          text-transform: uppercase; letter-spacing: 0.1em; padding-top: 0.15rem; }
+  .ok { color: var(--green); }
+  .miss { color: var(--fog-dim); }
+
+  .feed { font-family: var(--mono); font-size: 0.72rem; line-height: 1.7; color: var(--fog);
+          max-height: 11rem; overflow-y: auto; background: var(--ink); padding: 0.6rem 0.7rem;
+          border-left: 2px solid var(--line); }
+  .feed div { white-space: pre-wrap; word-break: break-word; }
+
+  .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: 1.5rem;
+           background: var(--amber); color: var(--ink); font-family: var(--mono); font-size: 0.78rem;
+           padding: 0.6rem 1.1rem; opacity: 0; pointer-events: none; transition: opacity .18s; }
+  .toast.show { opacity: 1; }
+  .toast.err { background: var(--red); }
+
+  .hint { font-size: 0.8rem; color: var(--fog-dim); margin: 0.6rem 0 0; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <span class="mark">padctl</span>
+    <span class="status">
+      <span id="conn"><span class="dot" id="dot">&#9679;</span> <span id="conn-text">connecting</span></span>
+      <span id="dirty">saved</span>
+    </span>
+  </header>
+
+  <div class="cols">
+    <div>
+      <div class="tabs" role="tablist">
+        <button role="tab" data-table="bindings" aria-selected="true">Base</button>
+        <button role="tab" data-table="l1_bindings" aria-selected="false">Hold L1</button>
+        <button role="tab" data-table="desktop_bindings" aria-selected="false">Outside terminal</button>
+      </div>
+
+      <svg class="pad" viewBox="0 0 420 250" role="group" aria-label="Controller">
+        <path class="shell" d="M96 62 h228 a34 34 0 0 1 34 34 v34 c0 46 -18 84 -44 84 c-20 0 -30 -22 -44 -30 h-120 c-14 8 -24 30 -44 30 c-26 0 -44 -38 -44 -84 v-34 a34 34 0 0 1 34 -34 z" />
+        <g class="ctl" data-id="l2" tabindex="0" role="button" aria-label="L2"><rect class="hit" x="86" y="20" width="60" height="26"/><rect class="shape" x="90" y="22" width="52" height="20" rx="7"/><text class="glyph" x="107" y="37">L2</text></g>
+        <g class="ctl" data-id="r2" tabindex="0" role="button" aria-label="R2"><rect class="hit" x="274" y="20" width="60" height="26"/><rect class="shape" x="278" y="22" width="52" height="20" rx="7"/><text class="glyph" x="295" y="37">R2</text></g>
+        <g class="ctl" data-id="l1" tabindex="0" role="button" aria-label="L1"><rect class="hit" x="86" y="44" width="60" height="24"/><rect class="shape" x="90" y="46" width="52" height="18" rx="7"/><text class="glyph" x="107" y="60">L1</text></g>
+        <g class="ctl" data-id="r1" tabindex="0" role="button" aria-label="R1"><rect class="hit" x="274" y="44" width="60" height="24"/><rect class="shape" x="278" y="46" width="52" height="18" rx="7"/><text class="glyph" x="295" y="60">R1</text></g>
+        <g class="ctl" data-id="dpad_up" tabindex="0" role="button" aria-label="D-pad up"><rect class="hit" x="98" y="82" width="20" height="20"/><rect class="shape" x="100" y="86" width="16" height="16"/></g>
+        <g class="ctl" data-id="dpad_left" tabindex="0" role="button" aria-label="D-pad left"><rect class="hit" x="80" y="100" width="20" height="20"/><rect class="shape" x="84" y="102" width="16" height="16"/></g>
+        <g class="ctl" data-id="dpad_right" tabindex="0" role="button" aria-label="D-pad right"><rect class="hit" x="116" y="100" width="20" height="20"/><rect class="shape" x="116" y="102" width="16" height="16"/></g>
+        <g class="ctl" data-id="dpad_down" tabindex="0" role="button" aria-label="D-pad down"><rect class="hit" x="98" y="118" width="20" height="20"/><rect class="shape" x="100" y="118" width="16" height="16"/></g>
+        <g class="ctl" data-id="north" tabindex="0" role="button" aria-label="Triangle"><rect class="hit" x="288" y="76" width="34" height="30"/><circle class="shape" cx="305" cy="91" r="13"/><text class="glyph" x="301" y="96">&#9651;</text></g>
+        <g class="ctl" data-id="west" tabindex="0" role="button" aria-label="Square"><rect class="hit" x="264" y="100" width="34" height="30"/><circle class="shape" cx="281" cy="115" r="13"/><text class="glyph" x="277" y="120">&#9633;</text></g>
+        <g class="ctl" data-id="east" tabindex="0" role="button" aria-label="Circle"><rect class="hit" x="312" y="100" width="34" height="30"/><circle class="shape" cx="329" cy="115" r="13"/><text class="glyph" x="325" y="120">&#9711;</text></g>
+        <g class="ctl" data-id="south" tabindex="0" role="button" aria-label="Cross"><rect class="hit" x="288" y="124" width="34" height="30"/><circle class="shape" cx="305" cy="139" r="13"/><text class="glyph" x="301" y="144">&#10005;</text></g>
+        <g class="ctl" data-id="touchpad" tabindex="0" role="button" aria-label="Touchpad"><rect class="hit" x="158" y="74" width="104" height="62"/><rect class="shape" x="162" y="78" width="96" height="54" rx="8"/></g>
+        <g class="ctl" data-id="view" tabindex="0" role="button" aria-label="Create"><rect class="hit" x="140" y="60" width="22" height="18"/><rect class="shape" x="144" y="62" width="12" height="14" rx="3"/></g>
+        <g class="ctl" data-id="menu" tabindex="0" role="button" aria-label="Options"><rect class="hit" x="258" y="60" width="22" height="18"/><rect class="shape" x="264" y="62" width="12" height="14" rx="3"/></g>
+        <g class="ctl" data-id="l3" tabindex="0" role="button" aria-label="Left stick"><rect class="hit" x="146" y="146" width="60" height="60"/><circle class="shape" cx="176" cy="176" r="26"/><circle class="shape" cx="176" cy="176" r="15"/></g>
+        <g class="ctl" data-id="r3" tabindex="0" role="button" aria-label="Right stick"><rect class="hit" x="214" y="146" width="60" height="60"/><circle class="shape" cx="244" cy="176" r="26"/><circle class="shape" cx="244" cy="176" r="15"/></g>
+      </svg>
+      <p class="hint" id="pad-hint">Press a button on the controller and it selects here. Sticks and swipes are in the list below.</p>
+
+      <div class="panel">
+        <h2>Not on the diagram</h2>
+        <div class="row" id="extra-controls"></div>
+      </div>
+
+      <div class="panel">
+        <h2>Live</h2>
+        <div class="feed" id="feed"></div>
+      </div>
+    </div>
+
+    <div>
+      <div class="panel">
+        <p class="selname" id="sel-name">Nothing selected</p>
+        <p class="selid" id="sel-id">pick a control</p>
+        <div id="editor"></div>
+        <div class="row" style="margin-top: 1rem;">
+          <button class="act primary" id="save" disabled>Save</button>
+          <button class="act" id="revert" disabled>Revert</button>
+          <button class="act" id="unbind">Unbind</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>This machine</h2>
+        <div id="detected"></div>
+        <div class="row" style="margin-top: 0.9rem;">
+          <button class="act" id="suggest">Rebuild from my system settings</button>
+        </div>
+        <p class="hint">Reads your real screenshot, spaces and Mission Control shortcuts, and only binds apps it can find. Review, then Save.</p>
+      </div>
+
+      <div class="panel" id="notes-panel" hidden>
+        <h2>Left unbound, and why</h2>
+        <div id="notes"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// Mirrors KEY_CODES in padctl.js, so a config written by the daemon reads back
+// as something a person recognises rather than a bare number.
+const KEY_NAMES = {
+  36: "enter", 48: "tab", 49: "space", 51: "backspace", 53: "escape",
+  123: "left", 124: "right", 125: "down", 126: "up", 61: "right option",
+  29: "0", 18: "1", 19: "2", 20: "3", 21: "4", 23: "5", 22: "6", 26: "7", 28: "8", 25: "9",
+  0: "a", 11: "b", 8: "c", 2: "d", 14: "e", 3: "f", 5: "g", 4: "h", 34: "i", 38: "j",
+  40: "k", 37: "l", 46: "m", 45: "n", 31: "o", 35: "p", 12: "q", 15: "r", 1: "s", 17: "t",
+  32: "u", 9: "v", 13: "w", 7: "x", 16: "y", 6: "z"
+};
+const CODE_TO_KEY = {
+  Enter: "enter", Tab: "tab", Space: "space", Backspace: "backspace", Escape: "escape",
+  ArrowLeft: "left", ArrowRight: "right", ArrowDown: "down", ArrowUp: "up"
+};
+const MOD_SYMBOL = { command: "⌘", shift: "⇧", option: "⌥", control: "⌃" };
+
+const LABELS = {
+  south: "Cross", east: "Circle", west: "Square", north: "Triangle",
+  dpad_up: "D-pad up", dpad_down: "D-pad down", dpad_left: "D-pad left", dpad_right: "D-pad right",
+  l1: "L1", r1: "R1", l2: "L2", r2: "R2", l3: "Left stick click", r3: "Right stick click",
+  menu: "Options", view: "Create", touchpad: "Touchpad click",
+  lstick_up: "Left stick up", lstick_down: "Left stick down",
+  lstick_left: "Left stick left", lstick_right: "Left stick right",
+  rstick_up: "Right stick up", rstick_down: "Right stick down",
+  rstick_left: "Right stick left", rstick_right: "Right stick right",
+  swipe_left: "Swipe left", swipe_right: "Swipe right", swipe_up: "Swipe up", swipe_down: "Swipe down",
+  swipe_left_x2: "Double swipe left", swipe_right_x2: "Double swipe right",
+  swipe_up_x2: "Double swipe up", swipe_down_x2: "Double swipe down"
+};
+
+const EXTRA = [
+  "lstick_up", "lstick_down", "lstick_left", "lstick_right",
+  "rstick_up", "rstick_down", "rstick_left", "rstick_right",
+  "swipe_left", "swipe_right", "swipe_up", "swipe_down",
+  "swipe_left_x2", "swipe_right_x2", "swipe_up_x2", "swipe_down_x2"
+];
+
+const state = { config: null, table: "bindings", sel: null, dirty: false, capturing: false };
+
+const $ = (id) => document.getElementById(id);
+
+function toast(msg, isErr) {
+  const t = $("toast");
+  t.textContent = msg;
+  t.className = "toast show" + (isErr ? " err" : "");
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => { t.className = "toast"; }, 2200);
+}
+
+function keyLabel(action) {
+  if (!action) return "";
+  const key = typeof action.key === "number" ? (KEY_NAMES[action.key] ?? action.key) : action.key;
+  const mods = (action.modifiers || []).map((m) => MOD_SYMBOL[m] || m).join("");
+  return mods + String(key).toUpperCase();
+}
+
+function summarise(action) {
+  if (!action) return null;
+  switch (action.type) {
+    case "hotkey": return keyLabel(action);
+    case "click": return "Click " + (action.button || "left");
+    case "hold": return "Hold " + (action.button || "left") + " (tap clicks, hold drags)";
+    case "exec": return action.cmd;
+    case "keys": return (action.keys || []).join(" ") + " → terminal pane";
+    case "text": return "“" + String(action.text || "").slice(0, 40) + "”";
+    case "workspace": return "Workspace " + (action.dir || "next");
+    default: return action.type;
+  }
+}
+
+function table() { return state.config?.[state.table] ?? {}; }
+
+function markDirty(on) {
+  state.dirty = on;
+  $("dirty").textContent = on ? "unsaved" : "saved";
+  $("dirty").style.color = on ? "var(--amber)" : "";
+  $("save").disabled = !on;
+  $("revert").disabled = !on;
+}
+
+function paintPad() {
+  const t = table();
+  document.querySelectorAll(".ctl").forEach((el) => {
+    el.classList.toggle("bound", Boolean(t[el.dataset.id]));
+    el.classList.toggle("sel", el.dataset.id === state.sel);
+  });
+  const box = $("extra-controls");
+  box.innerHTML = "";
+  EXTRA.forEach((id) => {
+    const b = document.createElement("button");
+    b.className = "act" + (id === state.sel ? " primary" : "");
+    b.textContent = LABELS[id] + (t[id] ? " · " + (summarise(t[id]) || "").slice(0, 18) : "");
+    b.addEventListener("click", () => select(id));
+    box.appendChild(b);
+  });
+}
+
+function field(labelText, node) {
+  const wrap = document.createElement("div");
+  wrap.className = "field";
+  const l = document.createElement("label");
+  l.textContent = labelText;
+  wrap.appendChild(l);
+  wrap.appendChild(node);
+  return wrap;
+}
+
+function select(id) {
+  state.sel = id;
+  $("sel-name").textContent = LABELS[id] || id;
+  $("sel-id").textContent = id + "  ·  " + { bindings: "base", l1_bindings: "holding L1", desktop_bindings: "outside the terminal" }[state.table];
+  paintPad();
+  renderEditor();
+}
+
+function setAction(next) {
+  if (!state.config[state.table]) state.config[state.table] = {};
+  if (next === null) delete state.config[state.table][state.sel];
+  else state.config[state.table][state.sel] = next;
+  markDirty(true);
+  paintPad();
+  renderEditor();
+}
+
+function renderEditor() {
+  const host = $("editor");
+  host.innerHTML = "";
+  if (!state.sel) return;
+
+  const current = table()[state.sel] || null;
+
+  const sel = document.createElement("select");
+  ["(unbound)", "hotkey", "click", "hold", "exec", "keys", "text", "workspace"].forEach((t) => {
+    const o = document.createElement("option");
+    o.value = t === "(unbound)" ? "" : t;
+    o.textContent = t;
+    if ((current?.type ?? "") === o.value) o.selected = true;
+    sel.appendChild(o);
+  });
+  sel.addEventListener("change", () => {
+    const t = sel.value;
+    if (!t) return setAction(null);
+    const seed = { hotkey: { type: "hotkey", key: "", modifiers: [] }, click: { type: "click", button: "left" },
+      hold: { type: "hold", button: "left" }, exec: { type: "exec", cmd: "" },
+      keys: { type: "keys", keys: [] }, text: { type: "text", text: "" },
+      workspace: { type: "workspace", dir: "next" } }[t];
+    setAction(seed);
+  });
+  host.appendChild(field("Does what", sel));
+
+  if (!current) return;
+
+  if (current.type === "hotkey") {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "capture";
+    const label = keyLabel(current);
+    btn.textContent = label || "Click, then press the keys";
+    btn.addEventListener("click", () => {
+      state.capturing = true;
+      btn.classList.add("arm");
+      btn.textContent = "Press the keys…";
+      btn.focus();
+    });
+    btn.addEventListener("keydown", (e) => {
+      if (!state.capturing) return;
+      e.preventDefault();
+      if (["Meta", "Shift", "Alt", "Control"].includes(e.key)) return;
+      let key = CODE_TO_KEY[e.code];
+      if (!key && /^Key[A-Z]$/.test(e.code)) key = e.code.slice(3).toLowerCase();
+      if (!key && /^Digit\d$/.test(e.code)) key = e.code.slice(5);
+      if (!key) { toast("That key isn't supported yet", true); return; }
+      const modifiers = [];
+      if (e.shiftKey) modifiers.push("shift");
+      if (e.ctrlKey) modifiers.push("control");
+      if (e.altKey) modifiers.push("option");
+      if (e.metaKey) modifiers.push("command");
+      state.capturing = false;
+      setAction({ ...current, key, modifiers });
+    });
+    btn.addEventListener("blur", () => { state.capturing = false; btn.classList.remove("arm"); });
+    host.appendChild(field("Shortcut", btn));
+
+    const rep = document.createElement("select");
+    [["", "no"], ["true", "yes"]].forEach(([v, t]) => {
+      const o = document.createElement("option"); o.value = v; o.textContent = t;
+      if (Boolean(current.repeat) === (v === "true")) o.selected = true;
+      rep.appendChild(o);
+    });
+    rep.addEventListener("change", () => {
+      const next = { ...current };
+      if (rep.value) next.repeat = true; else delete next.repeat;
+      setAction(next);
+    });
+    host.appendChild(field("Repeat while held", rep));
+  }
+
+  if (current.type === "click" || current.type === "hold") {
+    const s = document.createElement("select");
+    ["left", "right"].forEach((b) => {
+      const o = document.createElement("option"); o.value = b; o.textContent = b;
+      if ((current.button || "left") === b) o.selected = true; s.appendChild(o);
+    });
+    s.addEventListener("change", () => setAction({ ...current, button: s.value }));
+    host.appendChild(field("Button", s));
+  }
+
+  if (current.type === "exec") {
+    const i = document.createElement("input");
+    i.type = "text"; i.value = current.cmd || ""; i.placeholder = "open -a Spokenly";
+    i.addEventListener("change", () => setAction({ ...current, cmd: i.value }));
+    host.appendChild(field("Shell command", i));
+  }
+
+  if (current.type === "keys") {
+    const i = document.createElement("input");
+    i.type = "text"; i.value = (current.keys || []).join(" "); i.placeholder = "esc  ctrl+w  shift+tab";
+    i.addEventListener("change", () => setAction({ ...current, keys: i.value.split(/\s+/).filter(Boolean) }));
+    host.appendChild(field("Keys, space separated", i));
+  }
+
+  if (current.type === "text") {
+    const t = document.createElement("textarea");
+    t.value = current.text || ""; t.placeholder = "keep going";
+    t.addEventListener("change", () => setAction({ ...current, text: t.value }));
+    host.appendChild(field("Types this into the pane", t));
+  }
+
+  if (current.type === "workspace") {
+    const s = document.createElement("select");
+    ["next", "prev"].forEach((d) => {
+      const o = document.createElement("option"); o.value = d; o.textContent = d;
+      if ((current.dir || "next") === d) o.selected = true; s.appendChild(o);
+    });
+    s.addEventListener("change", () => setAction({ ...current, dir: s.value }));
+    host.appendChild(field("Direction", s));
+  }
+
+  if (current.type === "keys" || current.type === "text" || current.type === "workspace") {
+    const p = document.createElement("p");
+    p.className = "hint";
+    p.textContent = "Needs herdr. These reach a terminal pane, not whatever has focus.";
+    host.appendChild(p);
+  }
+}
+
+function renderDetected(d, shortcuts) {
+  const host = $("detected");
+  host.innerHTML = "";
+  const rows = [
+    ["Terminal", d?.terminal ? d.terminal.name : null],
+    ["herdr", d?.herdr ? d.herdr.path : null],
+    ["Dictation", d?.dictation ? d.dictation.name : null]
+  ];
+  if (shortcuts) {
+    rows.push(["Screenshot", shortcuts.screenshot_clipboard?.action
+      ? keyLabel(shortcuts.screenshot_clipboard.action) + (shortcuts.screenshot_clipboard.source === "user" ? " (yours)" : " (default)")
+      : null]);
+    rows.push(["Mission Control", shortcuts.mission_control?.action ? keyLabel(shortcuts.mission_control.action) : null]);
+  }
+  rows.forEach(([k, v]) => {
+    const row = document.createElement("div");
+    row.className = "kv";
+    const a = document.createElement("span"); a.textContent = k;
+    const b = document.createElement("span");
+    b.textContent = v || "not found";
+    b.className = v ? "ok" : "miss";
+    row.append(a, b);
+    host.appendChild(row);
+  });
+}
+
+function renderNotes(notes) {
+  const panel = $("notes-panel");
+  const host = $("notes");
+  host.innerHTML = "";
+  if (!notes || !notes.length) { panel.hidden = true; return; }
+  panel.hidden = false;
+  notes.forEach((n) => {
+    const d = document.createElement("div");
+    d.className = "note";
+    const b = document.createElement("b"); b.textContent = n.what;
+    const p = document.createElement("span"); p.textContent = n.why;
+    d.append(b, p);
+    host.appendChild(d);
+  });
+}
+
+async function load() {
+  const r = await fetch("/api/state");
+  const s = await r.json();
+  state.config = s.config;
+  renderDetected(s.detected, s.shortcuts);
+  renderNotes(s.notes);
+  markDirty(false);
+  paintPad();
+  if (state.sel) renderEditor();
+}
+
+$("save").addEventListener("click", async () => {
+  const r = await fetch("/api/config", {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(state.config)
+  });
+  const out = await r.json();
+  if (!r.ok) return toast(out.error || "Save failed", true);
+  markDirty(false);
+  toast("Saved. Live already.");
+});
+
+$("revert").addEventListener("click", () => { load(); toast("Reverted"); });
+$("unbind").addEventListener("click", () => { if (state.sel) setAction(null); });
+
+$("suggest").addEventListener("click", async () => {
+  const r = await fetch("/api/suggest");
+  const out = await r.json();
+  if (!r.ok) return toast(out.error || "Could not build one", true);
+  state.config = out.config;
+  renderNotes(out.notes);
+  markDirty(true);
+  paintPad();
+  renderEditor();
+  toast("Built from your settings. Review, then Save.");
+});
+
+document.querySelectorAll('[role="tab"]').forEach((btn) => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll('[role="tab"]').forEach((b) => b.setAttribute("aria-selected", String(b === btn)));
+    state.table = btn.dataset.table;
+    if (state.sel) select(state.sel); else paintPad();
+  });
+});
+
+document.querySelectorAll(".ctl").forEach((el) => {
+  el.addEventListener("click", () => select(el.dataset.id));
+  el.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); select(el.dataset.id); }
+  });
+});
+
+// Live wire to the daemon: raw presses drive press-to-bind, and the log stream
+// is the same one the file gets.
+const es = new EventSource("/api/events");
+es.addEventListener("open", () => {
+  $("dot").classList.add("live");
+  $("conn-text").textContent = "connected";
+});
+es.addEventListener("error", () => {
+  $("dot").classList.remove("live");
+  $("conn-text").textContent = "reconnecting";
+});
+es.addEventListener("press", (e) => {
+  const { id, pressed } = JSON.parse(e.data);
+  const el = document.querySelector('.ctl[data-id="' + id + '"]');
+  if (el) el.classList.toggle("down", pressed);
+  // Pressing a button selects it, so binding never means hunting a dropdown.
+  if (pressed && !state.capturing) select(id);
+});
+es.addEventListener("activity", (e) => {
+  const { line } = JSON.parse(e.data);
+  const feed = $("feed");
+  const d = document.createElement("div");
+  d.textContent = line;
+  feed.appendChild(d);
+  while (feed.childNodes.length > 60) feed.removeChild(feed.firstChild);
+  feed.scrollTop = feed.scrollHeight;
+});
+
+load();
+</script>
+</body>
+</html>

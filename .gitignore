@@ -15,3 +15,5 @@ padctl.log
 # Yours, not mine. install.sh seeds it from config.example.json.
 # My own is committed at configs/g.json if you want it as a starting point.
 config.json
+config.json.bak
+site/

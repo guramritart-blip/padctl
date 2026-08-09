@@ -36,10 +36,51 @@ file picker to paste the path.
 Buttons that only move the mouse will work regardless, which is exactly what
 makes this confusing: **half of it working is the symptom.**
 
+## The configurator
+
+The daemon serves one, on loopback:
+
+```
+http://127.0.0.1:7757
+```
+
+**Press a button on the controller and the page selects it.** The daemon already
+sees every press, so binding never means hunting through a dropdown. Shortcut
+fields work the same way: click, then press the keys you want.
+
+It's served by the daemon rather than from a website on purpose. A page on
+`https://` talking to `http://127.0.0.1` runs into mixed-content blocking, CORS
+and Chrome's private-network rules, each breaking differently per browser. Same
+origin has none of those problems.
+
+Turn it off or move it with `"ui": { "enabled": false }` or `"ui": { "port": 7788 }`.
+
 ## Configuring
 
 Edit `config.json` and save. It reloads live, no restart. Invalid JSON keeps the
 last good config rather than crashing.
+
+### Your shortcuts, not ours
+
+On first run the installer writes a config **for your machine**, and the
+configurator can rebuild it any time.
+
+- **System shortcuts are read from your settings.** Screenshot, Mission Control
+  and space-switching are all remappable, and macOS keeps the real values in
+  `com.apple.symbolichotkeys`. padctl reads them, so the screenshot chord fires
+  *your* combination. If you've switched one off entirely, it stays unbound.
+- **App bindings appear only if the app is there.** No herdr means no pane
+  targeting, so those controls are left out rather than bound to something that
+  silently fails. Same for the dictation button.
+- **Whatever gets left out says why**, in the configurator and in the installer
+  output. An unbound button is honest. A bound button that does nothing is a bug
+  report.
+
+Rebuild it yourself with:
+
+```bash
+node scripts/init-config.js --force   # keeps your old one as config.json.bak
+```
 
 Three tables, in priority order:
 

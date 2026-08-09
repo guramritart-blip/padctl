@@ -15,6 +15,7 @@ const { execFile, exec, spawn } = require('node:child_process')
 const fs = require('node:fs')
 const path = require('node:path')
 const HID = require('node-hid')
+const ui = require('./lib/ui')
 
 const VENDOR_ID = 0x054c
 const PRODUCT_ID = 0x0ce6
@@ -25,7 +26,9 @@ const DEBUG = process.argv.includes('--debug')
 const DRY = process.argv.includes('--dry')
 
 function log(msg) {
-  console.log(`[${new Date().toTimeString().slice(0, 8)}] ${msg}`)
+  const line = `[${new Date().toTimeString().slice(0, 8)}] ${msg}`
+  console.log(line)
+  ui.activity(line) // no-op until the configurator is open
 }
 
 // ---------------------------------------------------------------- config
@@ -43,6 +46,7 @@ function loadConfig() {
       mouse: next.mouse ?? null,
       scroll: next.scroll ?? null,
       chords: next.chords ?? {},
+      ui: next.ui ?? {},
     }
     const n = Object.keys(config.bindings).length + Object.keys(config.l1_bindings).length
     log(`config loaded (${n} bindings)`)
@@ -483,6 +487,7 @@ function setButton(id, pressed) {
   if (buttonState[id] === pressed) return
   buttonState[id] = pressed
   if (id === 'l1') l1Held = pressed
+  ui.press(id, pressed)
   if (pressed) {
     pressedAt[id] = Date.now()
     fire(id)
@@ -693,6 +698,28 @@ for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
 
 loadConfig()
 setTimeout(checkPermissions, 3000)
+
+// The configurator. Loopback only, and off if `"ui": {"enabled": false}`.
+const CONTROLS = [
+  'south', 'east', 'west', 'north',
+  'dpad_up', 'dpad_down', 'dpad_left', 'dpad_right',
+  'l1', 'r1', 'l2', 'r2', 'l3', 'r3', 'menu', 'view', 'touchpad',
+  'lstick_up', 'lstick_down', 'lstick_left', 'lstick_right',
+  'rstick_up', 'rstick_down', 'rstick_left', 'rstick_right',
+  'swipe_left', 'swipe_right', 'swipe_up', 'swipe_down',
+  'swipe_left_x2', 'swipe_right_x2', 'swipe_up_x2', 'swipe_down_x2',
+]
+
+if (config.ui?.enabled !== false && !DRY) {
+  ui.start({
+    port: config.ui?.port,
+    configPath: CONFIG_PATH,
+    getConfig: () => config,
+    controls: CONTROLS,
+    actionTypes: ['hotkey', 'click', 'hold', 'exec', 'keys', 'text', 'workspace'],
+    log,
+  })
+}
 log(
   `padctl running${DEBUG ? ' (debug)' : ''}${DRY ? ' (DRY RUN, nothing fires)' : ''}. ` +
     `Edit config.json to rebind, saves apply live.`

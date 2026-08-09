@@ -6,9 +6,10 @@
     "text": "{ type: text, text: <string>, submit: true|false } -> focused pane",
     "workspace": "{ type: workspace, dir: next|prev }",
     "hotkey": "{ type: hotkey, key: enter|escape|<code>, modifiers: [command,shift,option,control] } -> SYSTEM-WIDE, works in any app",
-    "hold": "{ type: hold, button: left|right } -> SYSTEM-WIDE. Down on press, up on release: tap = click, keep held = drag."
+    "hold": "{ type: hold, button: left|right } -> SYSTEM-WIDE. Down on press, up on release: tap = click, keep held = drag.",
+    "_repeat": "Add \"repeat\": true to any action to make holding the button fire it again, like a held keyboard key. Tune with repeat_delay_ms (default 400) and repeat_ms (default 60)."
   },
-  "_controls": "south east west north dpad_up dpad_down dpad_left dpad_right l1 r1 l2 r2 l3 r3 menu view touchpad lstick_up lstick_down lstick_left lstick_right rstick_up rstick_down rstick_left rstick_right  (l1 is the layer modifier, never bindable)  |  touchpad swipes: swipe_left swipe_right swipe_up swipe_down",
+  "_controls": "south east west north dpad_up dpad_down dpad_left dpad_right l1 r1 l2 r2 l3 r3 menu view touchpad lstick_up lstick_down lstick_left lstick_right rstick_up rstick_down rstick_left rstick_right  (l1 is the layer modifier, never bindable)  |  touchpad swipes: swipe_left swipe_right swipe_up swipe_down  (+ _x2 on any of them for a double swipe, e.g. swipe_up_x2. A direction only waits for a second swipe if its _x2 is bound.)",
   "bindings": {
     "south": {
       "type": "hold",
@@ -18,7 +19,8 @@
       "type": "keys",
       "keys": [
         "esc"
-      ]
+      ],
+      "repeat": true
     },
     "north": {
       "_note": "Fakes a bare right-Option press, which is Spokenly's own shortcut, so its native toggle gives start AND stop from one button. The spokenly://start URL only ever starts. Needs Accessibility for whichever process posts the event.",
@@ -107,6 +109,14 @@
       "modifiers": [
         "control"
       ]
+    },
+    "swipe_up_x2": {
+      "_note": "Mission Control, same as a three-finger swipe up on the trackpad.",
+      "type": "hotkey",
+      "key": "up",
+      "modifiers": [
+        "control"
+      ]
     }
   },
   "l1_bindings": {
@@ -122,9 +132,10 @@
       ]
     },
     "east": {
-      "type": "keys",
-      "keys": [
-        "ctrl+c"
+      "type": "hotkey",
+      "key": "c",
+      "modifiers": [
+        "command"
       ]
     },
     "north": {
@@ -176,6 +187,12 @@
     "dpad_up": {
       "type": "text",
       "text": "keep going"
+    },
+    "dpad_down": {
+      "type": "keys",
+      "keys": [
+        "ctrl+c"
+      ]
     }
   },
   "mouse": {
@@ -192,7 +209,8 @@
     },
     "east": {
       "type": "hotkey",
-      "key": "escape"
+      "key": "escape",
+      "repeat": true
     },
     "west": {
       "type": "hotkey",

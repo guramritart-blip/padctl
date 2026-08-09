@@ -125,10 +125,53 @@ const KEY_CODES = {
   n: 45, o: 31, p: 35, q: 12, r: 15, s: 1, t: 17, u: 32, v: 9, w: 13, x: 7, y: 16, z: 6,
 }
 
+// Key repeat. `"repeat": true` on an action makes holding the button fire it
+// again on a delay, the way a held keyboard key behaves. Worth it for anything
+// you'd naturally hold down: arrows, backspace, escape.
+const REPEAT_DELAY_MS = 400
+const REPEAT_MS = 60
+const activeRepeats = new Map()
+
+function stopRepeat(id) {
+  const r = activeRepeats.get(id)
+  if (!r) return
+  clearTimeout(r.timeout)
+  clearInterval(r.interval)
+  activeRepeats.delete(id)
+}
+
+function stopAllRepeats() {
+  for (const id of [...activeRepeats.keys()]) stopRepeat(id)
+}
+
+function startRepeat(action, control, id) {
+  stopRepeat(id)
+  const entry = {}
+  entry.timeout = setTimeout(() => {
+    entry.interval = setInterval(() => {
+      // The release path clears this, but a dropped release (pad disconnect,
+      // config reload mid-press) would otherwise repeat forever.
+      if (!buttonState[id]) return stopRepeat(id)
+      runOnce(action, control, id)
+    }, action.repeat_ms ?? REPEAT_MS)
+  }, action.repeat_delay_ms ?? REPEAT_DELAY_MS)
+  activeRepeats.set(id, entry)
+}
+
 // `control` is the decorated label used for logging ("south [desktop:com.foo]").
 // `id` is the raw control name, which is what release-tracking has to key on,
 // since by the time the button comes up the layer or frontmost app may differ.
 async function run(action, control, id = control) {
+  await runOnce(action, control, id)
+
+  // `hold` already has press/release semantics of its own, and a chord id is not
+  // a real button so there'd be nothing to watch for release.
+  if (action?.repeat && action.type !== 'hold' && !DRY && buttonState[id]) {
+    startRepeat(action, control, id)
+  }
+}
+
+async function runOnce(action, control, id = control) {
   if (!action) return
   if (DRY) return log(`${control} -> [dry] ${JSON.stringify(action)}`)
 
@@ -304,6 +347,8 @@ const pressedAt = {}
 const activeHolds = new Map()
 
 async function releaseButton(id) {
+  stopRepeat(id)
+
   // A chord participant tapped and let go before its window expired: resolve the
   // solo action now rather than dropping it.
   const pending = pendingSolo.get(id)
@@ -486,6 +531,37 @@ const SWIPE_X = 400
 const SWIPE_Y = 250
 let touch = { down: false, x0: 0, y0: 0 }
 
+// Double swipes ("swipe_up_x2"). A swipe only waits to see whether a second one
+// is coming if a double is actually bound for that direction, so directions
+// without one stay instant.
+const DOUBLE_MS = 450
+const pendingSwipe = new Map()
+
+function isBound(id) {
+  return Boolean(
+    config.bindings?.[id] ?? config.desktop_bindings?.[id] ?? config.l1_bindings?.[id],
+  )
+}
+
+function fireSwipe(name) {
+  const twice = `${name}_x2`
+  if (!isBound(twice)) return fire(name)
+
+  const pending = pendingSwipe.get(name)
+  if (pending) {
+    clearTimeout(pending)
+    pendingSwipe.delete(name)
+    return fire(twice)
+  }
+  pendingSwipe.set(
+    name,
+    setTimeout(() => {
+      pendingSwipe.delete(name)
+      fire(name)
+    }, DOUBLE_MS),
+  )
+}
+
 function handleTouch(contact, x, y) {
   if (contact && !touch.down) {
     touch = { down: true, x0: x, y0: y }
@@ -497,9 +573,9 @@ function handleTouch(contact, x, y) {
   const dx = x - touch.x0
   const dy = y - touch.y0
   if (Math.abs(dx) > Math.abs(dy)) {
-    if (Math.abs(dx) >= SWIPE_X) fire(dx > 0 ? 'swipe_right' : 'swipe_left')
+    if (Math.abs(dx) >= SWIPE_X) fireSwipe(dx > 0 ? 'swipe_right' : 'swipe_left')
   } else if (Math.abs(dy) >= SWIPE_Y) {
-    fire(dy > 0 ? 'swipe_down' : 'swipe_up')
+    fireSwipe(dy > 0 ? 'swipe_down' : 'swipe_up')
   }
 }
 
@@ -578,6 +654,7 @@ function connect() {
     for (const k of Object.keys(buttonState)) delete buttonState[k]
     l1Held = false
     releaseAllHolds() // a pad that dies mid-drag must not leave the mouse stuck down
+    stopAllRepeats()
   })
 }
 
@@ -607,6 +684,7 @@ function checkPermissions() {
 // wide is the worst failure this program can cause, so exit through here.
 for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
   process.on(sig, () => {
+    stopAllRepeats()
     releaseAllHolds()
     // The helper needs a tick to flush the up event before we take it down.
     setTimeout(() => process.exit(0), 60)

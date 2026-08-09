@@ -67,6 +67,32 @@ L1 is the layer modifier and can never be bound itself.
 That's the whole reason `desktop_bindings` exists: `keys` can't leave the
 terminal, `hotkey` can.
 
+### Key repeat
+
+```json
+"dpad_down": { "type": "hotkey", "key": "down", "repeat": true }
+```
+
+Holding the button fires the action again, the way a held keyboard key behaves:
+once immediately, then after 400ms, then every 60ms. Tune per binding with
+`repeat_delay_ms` and `repeat_ms`.
+
+Ignored on `hold` actions, which already mean something on release, and on
+chords, where there is no single button to watch.
+
+### Double swipes
+
+```json
+"swipe_up_x2": { "type": "hotkey", "key": "up", "modifiers": ["control"] }
+```
+
+Two swipes the same direction within 450ms. Any direction takes an `_x2`.
+
+A direction only waits to see whether a second swipe is coming **if its `_x2` is
+bound**, so directions without one stay instant. Bind both single and double for
+the same direction and the single one necessarily gets a 450ms delay, which is
+the cost of telling them apart.
+
 ### Chords
 
 ```json

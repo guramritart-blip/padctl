@@ -11,3 +11,7 @@ mousehelper
 
 padctl.log
 .DS_Store
+
+# Yours, not mine. install.sh seeds it from config.example.json.
+# My own is committed at configs/g.json if you want it as a starting point.
+config.json

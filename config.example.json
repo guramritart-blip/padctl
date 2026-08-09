@@ -1,0 +1,61 @@
+{
+  "_comment": "Starter config. Edit and save; padctl reloads live, no restart. A typo keeps the last good config instead of crashing. Everything here is herdr-free, so it works on a plain Mac. If you use herdr, see the `keys`/`text`/`workspace` actions, which target a herdr pane.",
+  "_actions": {
+    "exec": "{ type: exec, cmd: <shell command> }",
+    "keys": "{ type: keys, keys: [enter, ctrl+u, shift+tab, esc, up, ...] } -> focused herdr pane, NOT system-wide",
+    "text": "{ type: text, text: <string>, submit: true|false } -> focused herdr pane",
+    "workspace": "{ type: workspace, dir: next|prev } -> herdr workspaces",
+    "hotkey": "{ type: hotkey, key: enter|escape|a-z|0-9|<code>, modifiers: [command,shift,option,control] } -> SYSTEM-WIDE, works in any app",
+    "click": "{ type: click, button: left|right } -> SYSTEM-WIDE click",
+    "hold": "{ type: hold, button: left|right } -> SYSTEM-WIDE. Down on press, up on release: tap = click, keep held = drag."
+  },
+  "_controls": "south east west north dpad_up dpad_down dpad_left dpad_right l1 r1 l2 r2 l3 r3 menu view touchpad lstick_up lstick_down lstick_left lstick_right rstick_up rstick_down rstick_left rstick_right  (l1 is the layer modifier, never bindable)  |  touchpad swipes: swipe_left swipe_right swipe_up swipe_down",
+  "bindings": {
+    "south": { "type": "hold", "button": "left" },
+    "east": { "type": "hotkey", "key": "escape" },
+    "west": { "type": "hotkey", "key": "backspace" },
+    "dpad_up": { "type": "hotkey", "key": "up" },
+    "dpad_down": { "type": "hotkey", "key": "down" },
+    "dpad_left": { "type": "hotkey", "key": "left" },
+    "dpad_right": { "type": "hotkey", "key": "right" },
+    "r1": { "type": "click", "button": "left" },
+    "r2": { "type": "hotkey", "key": "enter" },
+    "l3": { "type": "hotkey", "key": "backspace", "modifiers": ["option"] },
+    "touchpad": { "type": "click", "button": "left" },
+    "swipe_left": { "type": "hotkey", "key": "right", "modifiers": ["control"] },
+    "swipe_right": { "type": "hotkey", "key": "left", "modifiers": ["control"] }
+  },
+  "_l1": "Hold L1 and press something. This layer wins everywhere, in any app.",
+  "l1_bindings": {
+    "south": { "type": "hotkey", "key": "v", "modifiers": ["command"] },
+    "east": { "type": "hotkey", "key": "c", "modifiers": ["command"] },
+    "west": { "type": "hotkey", "key": "w", "modifiers": ["command"] },
+    "dpad_left": { "type": "hotkey", "key": "left", "modifiers": ["command"] },
+    "dpad_right": { "type": "hotkey", "key": "right", "modifiers": ["command"] },
+    "lstick_left": { "type": "hotkey", "key": "left", "modifiers": ["control"] },
+    "lstick_right": { "type": "hotkey", "key": "right", "modifiers": ["control"] }
+  },
+  "mouse": {
+    "stick": "lstick",
+    "speed": 22,
+    "deadzone": 0.15
+  },
+  "scroll": {
+    "stick": "rstick",
+    "speed": 40,
+    "deadzone": 0.15,
+    "invert": false
+  },
+  "_desktop": "desktop_bindings override `bindings` whenever the frontmost app is NOT terminal_bundle. L1 always wins. Anything not listed falls back to `bindings`. Only useful once you have herdr-targeted `keys`/`text` bindings that need a system-wide counterpart.",
+  "terminal_bundle": "dev.warp.Warp-Stable",
+  "desktop_bindings": {},
+  "_chords": "Optional. e.g. {\"l2+r2\": {...}}. Both presses must land within 140ms of each other AND stay held 250ms. Any button named in a chord pays a 140ms delay on its solo action, so only chord buttons that can afford to be slow, and never put a destructive action here.",
+  "chords": {
+    "l2+r2": {
+      "_note": "Screenshot to clipboard. Safe to chord: a stray one costs nothing.",
+      "type": "hotkey",
+      "key": "2",
+      "modifiers": ["command", "shift"]
+    }
+  }
+}

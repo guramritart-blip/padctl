@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.g.padctl</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <!-- Frozen copy, NOT /opt/homebrew/bin/node. Accessibility is granted
+             per exact binary path, so a `brew upgrade node` would silently kill
+             every hotkey binding. This path is ours and never moves. -->
+        <string>__PADCTL__/bin/node</string>
+        <string>__PADCTL__/padctl.js</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>__PADCTL__</string>
+
+    <!-- padctl polls for the pad every 2s, so it can start before the
+         controller is on and simply picks it up when it connects. -->
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+
+    <!-- Don't let a crash-loop hammer the machine. -->
+    <key>ThrottleInterval</key>
+    <integer>10</integer>
+
+    <key>StandardOutPath</key>
+    <string>__PADCTL__/padctl.log</string>
+    <key>StandardErrorPath</key>
+    <string>__PADCTL__/padctl.log</string>
+
+    <!-- launchd gives a minimal PATH; herdr lives in ~/.local/bin. -->
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>__HOME__/.local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    </dict>
+</dict>
+</plist>

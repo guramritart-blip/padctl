@@ -1,0 +1,251 @@
+{
+  "_comment": "Edit and save. padctl reloads live, no restart. A typo keeps the last good config instead of crashing.",
+  "_actions": {
+    "exec": "{ type: exec, cmd: <shell command> }",
+    "keys": "{ type: keys, keys: [enter, ctrl+u, shift+tab, esc, up, ...] } -> focused pane",
+    "text": "{ type: text, text: <string>, submit: true|false } -> focused pane",
+    "workspace": "{ type: workspace, dir: next|prev }",
+    "hotkey": "{ type: hotkey, key: enter|escape|<code>, modifiers: [command,shift,option,control] } -> SYSTEM-WIDE, works in any app",
+    "hold": "{ type: hold, button: left|right } -> SYSTEM-WIDE. Down on press, up on release: tap = click, keep held = drag."
+  },
+  "_controls": "south east west north dpad_up dpad_down dpad_left dpad_right l1 r1 l2 r2 l3 r3 menu view touchpad lstick_up lstick_down lstick_left lstick_right rstick_up rstick_down rstick_left rstick_right  (l1 is the layer modifier, never bindable)  |  touchpad swipes: swipe_left swipe_right swipe_up swipe_down",
+  "bindings": {
+    "south": {
+      "type": "hold",
+      "button": "left"
+    },
+    "east": {
+      "type": "keys",
+      "keys": [
+        "esc"
+      ]
+    },
+    "north": {
+      "_note": "Fakes a bare right-Option press, which is Spokenly's own shortcut, so its native toggle gives start AND stop from one button. The spokenly://start URL only ever starts. Needs Accessibility for whichever process posts the event.",
+      "type": "exec",
+      "cmd": "osascript -e 'tell application \"System Events\" to key code 61'"
+    },
+    "west": {
+      "type": "keys",
+      "keys": [
+        "backspace"
+      ]
+    },
+    "dpad_up": {
+      "type": "keys",
+      "keys": [
+        "up"
+      ]
+    },
+    "dpad_down": {
+      "type": "keys",
+      "keys": [
+        "down"
+      ]
+    },
+    "dpad_left": {
+      "type": "keys",
+      "keys": [
+        "left"
+      ]
+    },
+    "dpad_right": {
+      "type": "keys",
+      "keys": [
+        "right"
+      ]
+    },
+    "l2": {
+      "type": "workspace",
+      "dir": "next"
+    },
+    "r2": {
+      "type": "keys",
+      "keys": [
+        "enter"
+      ]
+    },
+    "r1": {
+      "type": "click",
+      "button": "left"
+    },
+    "l3": {
+      "type": "keys",
+      "keys": [
+        "ctrl+w"
+      ]
+    },
+    "r3": {
+      "type": "keys",
+      "keys": [
+        "esc",
+        "esc"
+      ]
+    },
+    "view": {
+      "type": "exec",
+      "cmd": "herdr pane focus --direction left"
+    },
+    "menu": {
+      "type": "exec",
+      "cmd": "herdr pane focus --direction right"
+    },
+    "touchpad": {
+      "type": "click",
+      "button": "left"
+    },
+    "swipe_left": {
+      "type": "hotkey",
+      "key": "right",
+      "modifiers": [
+        "control"
+      ]
+    },
+    "swipe_right": {
+      "type": "hotkey",
+      "key": "left",
+      "modifiers": [
+        "control"
+      ]
+    }
+  },
+  "l1_bindings": {
+    "west": {
+      "type": "text",
+      "text": "/clear"
+    },
+    "south": {
+      "type": "hotkey",
+      "key": "v",
+      "modifiers": [
+        "command"
+      ]
+    },
+    "east": {
+      "type": "keys",
+      "keys": [
+        "ctrl+c"
+      ]
+    },
+    "north": {
+      "type": "exec",
+      "cmd": "open -a Spokenly"
+    },
+    "lstick_up": {
+      "type": "text",
+      "text": "Review this diff. Flag what is actually broken, cite file:line. Skip the nitpicks."
+    },
+    "lstick_down": {
+      "type": "text",
+      "text": "Something is broken. Ask me what is failing and what I already tried, then find the root cause before touching anything."
+    },
+    "lstick_left": {
+      "type": "hotkey",
+      "key": "left",
+      "modifiers": [
+        "control"
+      ]
+    },
+    "lstick_right": {
+      "type": "hotkey",
+      "key": "right",
+      "modifiers": [
+        "control"
+      ]
+    },
+    "r1": {
+      "type": "text",
+      "text": "/compact"
+    },
+    "l2": {
+      "type": "workspace",
+      "dir": "prev"
+    },
+    "r2": {
+      "type": "workspace",
+      "dir": "next"
+    },
+    "dpad_left": {
+      "type": "text",
+      "text": "Clean this up without changing behaviour. Simpler, not cleverer."
+    },
+    "dpad_right": {
+      "type": "text",
+      "text": "Write tests for what I just changed. Cover the edge cases that would actually bite."
+    },
+    "dpad_up": {
+      "type": "text",
+      "text": "keep going"
+    }
+  },
+  "mouse": {
+    "stick": "lstick",
+    "speed": 22,
+    "deadzone": 0.15
+  },
+  "_desktop": "desktop_bindings override `bindings` whenever the frontmost app is NOT terminal_bundle. L1 layer always wins. Anything not listed here falls back to `bindings`.",
+  "terminal_bundle": "dev.warp.Warp-Stable",
+  "desktop_bindings": {
+    "south": {
+      "type": "hold",
+      "button": "left"
+    },
+    "east": {
+      "type": "hotkey",
+      "key": "escape"
+    },
+    "west": {
+      "type": "hotkey",
+      "key": "backspace"
+    },
+    "dpad_up": {
+      "type": "hotkey",
+      "key": "up"
+    },
+    "dpad_down": {
+      "type": "hotkey",
+      "key": "down"
+    },
+    "dpad_left": {
+      "type": "hotkey",
+      "key": "left"
+    },
+    "dpad_right": {
+      "type": "hotkey",
+      "key": "right"
+    },
+    "r2": {
+      "type": "hotkey",
+      "key": "enter"
+    },
+    "r1": {
+      "type": "click",
+      "button": "left"
+    },
+    "l3": {
+      "type": "hotkey",
+      "key": "backspace",
+      "modifiers": [
+        "option"
+      ]
+    }
+  },
+  "scroll": {
+    "stick": "rstick",
+    "speed": 40,
+    "deadzone": 0.15,
+    "invert": false
+  },
+  "_chords": "Optional. e.g. {\"l2+r2\": {...}}. Both presses must land within 140ms of each other AND stay held 250ms. Buttons in a chord get a 140ms delay on their solo action; buttons in none stay instant. Empty = no chords, no delay anywhere.",
+  "chords": {
+    "l2+r2": {
+      "_note": "Screenshot to clipboard. Safe to chord: a stray one costs nothing.",
+      "type": "hotkey",
+      "key": "2",
+      "modifiers": [
+        "command",
+        "shift"
+      ]
+    }
+  }
+}

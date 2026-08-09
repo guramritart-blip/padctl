@@ -1,0 +1,13 @@
+# Rebuilt per machine by install.sh, and deliberately not shared.
+node_modules/
+
+# A frozen copy of whichever node the installing machine has. 68M, and the
+# Accessibility grant is tied to this exact path on this exact Mac, so copying
+# one between machines buys nothing.
+bin/
+
+# Compiled from mousehelper.swift at install time.
+mousehelper
+
+padctl.log
+.DS_Store

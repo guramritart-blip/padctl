@@ -55,6 +55,36 @@ origin has none of those problems.
 
 Turn it off or move it with `"ui": { "enabled": false }` or `"ui": { "port": 7788 }`.
 
+**Install it as a window.** In Chrome, install it from the address bar; Safari
+calls it Add to Dock. You get a standalone window with its own Dock icon and no
+browser chrome. `localhost` counts as a secure context, so this needs no
+certificate, no notarisation and no developer account. It only works while the
+daemon is running, since the daemon is what serves it.
+
+Reopen it any time:
+
+```bash
+node scripts/open-ui.js
+```
+
+Or from the pad. First run binds **L1 + Options** to open it.
+
+### Behaviour
+
+In the configurator, or in `config.json` directly:
+
+```json
+"behaviour": {
+  "on_connect": { "type": "exec", "cmd": "open -a Warp" },
+  "on_disconnect": { "type": "exec", "cmd": "osascript -e 'display notification \"pad gone\"'" }
+}
+```
+
+**Start at login** is the LaunchAgent's `RunAtLoad`, toggled from the
+configurator. Turning it off only changes what happens at your *next* login;
+whatever is running now keeps running. Pointer and scroll speed are sliders in
+the same panel.
+
 ## Configuring
 
 Edit `config.json` and save. It reloads live, no restart. Invalid JSON keeps the

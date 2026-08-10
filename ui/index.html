@@ -4,6 +4,12 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>padctl</title>
+<link rel="manifest" href="/manifest.webmanifest" />
+<link rel="apple-touch-icon" href="/icon-192.png" />
+<link rel="icon" href="/icon-192.png" />
+<meta name="theme-color" content="#06110f" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-title" content="padctl" />
 <style>
   :root {
     --ink: #06110f; --ink-2: #0b1a17; --ink-3: #0f2320; --line: #16302b;
@@ -117,6 +123,9 @@
   .toast.err { background: var(--red); }
 
   .hint { font-size: 0.8rem; color: var(--fog-dim); margin: 0.6rem 0 0; }
+  .sub { font-size: 0.78rem; color: var(--fog-dim); }
+  .toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+  input[type="range"] { width: 100%; accent-color: var(--amber); background: transparent; }
   @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 </head>
@@ -190,6 +199,43 @@
           <button class="act" id="suggest">Rebuild from my system settings</button>
         </div>
         <p class="hint">Reads your real screenshot, spaces and Mission Control shortcuts, and only binds apps it can find. Review, then Save.</p>
+      </div>
+
+      <div class="panel">
+        <h2>Behaviour</h2>
+        <div class="toggle-row">
+          <div>
+            <div>Start at login</div>
+            <div class="sub" id="login-sub">checking…</div>
+          </div>
+          <button class="act" id="login-toggle" disabled>…</button>
+        </div>
+
+        <div class="field" style="margin-top: 1rem;">
+          <label>When the controller connects</label>
+          <select id="on-connect"><option value="">do nothing</option><option value="exec">run a command</option></select>
+          <input type="text" id="on-connect-cmd" placeholder="open -a Warp" hidden style="margin-top: 0.4rem;" />
+        </div>
+
+        <div class="field">
+          <label>When it disconnects</label>
+          <select id="on-disconnect"><option value="">do nothing</option><option value="exec">run a command</option></select>
+          <input type="text" id="on-disconnect-cmd" placeholder="osascript -e 'display notification \"pad gone\"'" hidden style="margin-top: 0.4rem;" />
+        </div>
+
+        <div class="field">
+          <label>Pointer speed <span id="mouse-val" class="sub"></span></label>
+          <input type="range" id="mouse-speed" min="6" max="60" step="1" />
+        </div>
+        <div class="field" style="margin-bottom: 0;">
+          <label>Scroll speed <span id="scroll-val" class="sub"></span></label>
+          <input type="range" id="scroll-speed" min="10" max="120" step="2" />
+        </div>
+
+        <div class="row" style="margin-top: 1rem;">
+          <button class="act" id="install-app" hidden>Install as a window</button>
+        </div>
+        <p class="hint" id="install-hint">In Chrome, install this as its own desktop window from the address bar. Safari calls it Add to Dock.</p>
       </div>
 
       <div class="panel" id="notes-panel" hidden>
@@ -499,6 +545,7 @@ async function load() {
   renderNotes(s.notes);
   markDirty(false);
   paintPad();
+  renderBehaviour();
   if (state.sel) renderEditor();
 }
 
@@ -525,6 +572,7 @@ $("suggest").addEventListener("click", async () => {
   renderNotes(out.notes);
   markDirty(true);
   paintPad();
+  renderBehaviour();
   renderEditor();
   toast("Built from your settings. Review, then Save.");
 });
@@ -572,6 +620,106 @@ es.addEventListener("activity", (e) => {
   feed.scrollTop = feed.scrollHeight;
 });
 
+// ---------------------------------------------------------------- behaviour
+
+async function loadLoginItem() {
+  const r = await fetch("/api/login-item");
+  const s = await r.json();
+  const btn = $("login-toggle");
+  const sub = $("login-sub");
+  if (!s.installed) {
+    sub.textContent = "no LaunchAgent found, run install.sh";
+    btn.textContent = "unavailable";
+    btn.disabled = true;
+    return;
+  }
+  btn.disabled = false;
+  btn.textContent = s.enabled ? "on" : "off";
+  btn.classList.toggle("primary", s.enabled);
+  sub.textContent = s.enabled
+    ? "launchd starts it when you log in"
+    : "you'll start it yourself after a reboot";
+  btn.onclick = async () => {
+    btn.disabled = true;
+    const res = await fetch("/api/login-item", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ enabled: !s.enabled })
+    });
+    const out = await res.json();
+    if (!res.ok) { toast(out.error || "Could not change it", true); btn.disabled = false; return; }
+    toast(out.enabled ? "Will start at login" : "Won't start at login");
+    // Applying it reloads the agent, so the stream blips. That's expected.
+    setTimeout(loadLoginItem, 2500);
+  };
+}
+
+function bindBehaviourRow(selId, inputId, key) {
+  const sel = $(selId), input = $(inputId);
+  const current = state.config?.behaviour?.[key] ?? null;
+  sel.value = current ? "exec" : "";
+  input.hidden = !current;
+  input.value = current?.cmd ?? "";
+
+  sel.onchange = () => {
+    if (!state.config.behaviour) state.config.behaviour = {};
+    if (sel.value === "exec") {
+      input.hidden = false;
+      state.config.behaviour[key] = { type: "exec", cmd: input.value || "" };
+    } else {
+      input.hidden = true;
+      delete state.config.behaviour[key];
+    }
+    markDirty(true);
+  };
+  input.onchange = () => {
+    if (!state.config.behaviour) state.config.behaviour = {};
+    state.config.behaviour[key] = { type: "exec", cmd: input.value };
+    markDirty(true);
+  };
+}
+
+function bindSpeed(rangeId, valId, group) {
+  const r = $(rangeId), out = $(valId);
+  const cur = state.config?.[group]?.speed;
+  if (cur != null) r.value = cur;
+  out.textContent = r.value;
+  r.oninput = () => {
+    out.textContent = r.value;
+    if (!state.config[group]) state.config[group] = {};
+    state.config[group].speed = Number(r.value);
+    markDirty(true);
+  };
+}
+
+function renderBehaviour() {
+  bindBehaviourRow("on-connect", "on-connect-cmd", "on_connect");
+  bindBehaviourRow("on-disconnect", "on-disconnect-cmd", "on_disconnect");
+  bindSpeed("mouse-speed", "mouse-val", "mouse");
+  bindSpeed("scroll-speed", "scroll-val", "scroll");
+}
+
+// Chrome fires this when the page qualifies as installable. Safari never does,
+// which is why the written hint stays regardless.
+let installPrompt = null;
+window.addEventListener("beforeinstallprompt", (e) => {
+  e.preventDefault();
+  installPrompt = e;
+  $("install-app").hidden = false;
+  $("install-hint").textContent = "Opens in its own window, with its own Dock icon.";
+});
+$("install-app").addEventListener("click", async () => {
+  if (!installPrompt) return;
+  installPrompt.prompt();
+  await installPrompt.userChoice;
+  installPrompt = null;
+  $("install-app").hidden = true;
+});
+if (window.matchMedia("(display-mode: standalone)").matches) {
+  $("install-hint").textContent = "Running as its own window.";
+}
+
+loadLoginItem();
 load();
 </script>
 </body>

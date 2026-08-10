@@ -47,6 +47,7 @@ function loadConfig() {
       scroll: next.scroll ?? null,
       chords: next.chords ?? {},
       ui: next.ui ?? {},
+      behaviour: next.behaviour ?? {},
     }
     const n = Object.keys(config.bindings).length + Object.keys(config.l1_bindings).length
     log(`config loaded (${n} bindings)`)
@@ -299,6 +300,7 @@ function stickVector(cfg, defaultStick) {
 }
 
 function pump() {
+  if (!device) return // nothing to read from, so nothing to move
   const m = stickVector(config.mouse, 'lstick')
   if (m) mouseSend(`m ${m.x.toFixed(2)} ${(-m.y).toFixed(2)}`) // screen Y grows downward
 
@@ -649,6 +651,7 @@ function connect() {
   }
 
   log('controller connected')
+  if (config.behaviour?.on_connect) run(config.behaviour.on_connect, 'on connect')
   device.on('data', handleReport)
   device.on('error', () => {
     log('controller disconnected')
@@ -660,6 +663,8 @@ function connect() {
     l1Held = false
     releaseAllHolds() // a pad that dies mid-drag must not leave the mouse stuck down
     stopAllRepeats()
+    log('controller disconnected')
+    if (config.behaviour?.on_disconnect) run(config.behaviour.on_disconnect, 'on disconnect')
   })
 }
 
@@ -717,6 +722,7 @@ if (config.ui?.enabled !== false && !DRY) {
     getConfig: () => config,
     controls: CONTROLS,
     actionTypes: ['hotkey', 'click', 'hold', 'exec', 'keys', 'text', 'workspace'],
+    loginItem: require('./lib/login-item'),
     log,
   })
 }

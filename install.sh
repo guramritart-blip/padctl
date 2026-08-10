@@ -144,5 +144,14 @@ and watch it come up:
 
 You want to see "controller connected" and "accessibility OK".
 
-Edit $PADCTL/config.json to rebind. It reloads live, no restart.
+The configurator is at http://127.0.0.1:7757 — press a button on the pad and it
+selects there. Reopen it any time with:
+
+  node $PADCTL/scripts/open-ui.js
 EOF
+
+# Opening it is the friendlier last step than a wall of text, but only once the
+# daemon is actually serving, so give it a moment to come up.
+if [ -z "${PADCTL_NO_OPEN:-}" ]; then
+  ( sleep 3; "$PADCTL/bin/node" "$PADCTL/scripts/open-ui.js" >/dev/null 2>&1 || true ) &
+fi

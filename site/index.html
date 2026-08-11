@@ -1,0 +1,702 @@
+<title>L1R1</title>
+
+<style>
+  :root {
+    --ink: #000000;
+    --ink-2: #0b0b0b;
+    --ink-3: #141414;
+    --line: #242424;
+    --line-2: #1a1a1a;
+    --fog: #8a8a8a;
+    --fog-dim: #5c5c5c;
+    --chalk: #f4f4f4;
+
+    --orange: #ff7a00;
+    --blue: #2e6bff;
+    --green: #2fd07a;
+    --red: #ff3b30;
+
+    /* Swapped by the profile tabs. Everything live on the page reads this. */
+    --accent: var(--orange);
+    --accent-soft: rgba(255, 122, 0, 0.14);
+
+    --sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",
+            system-ui, "Helvetica Neue", sans-serif;
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
+
+    --pad: clamp(1.25rem, 5vw, 4rem);
+    --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  [data-profile="lightroom"] { --accent: var(--blue); --accent-soft: rgba(46, 107, 255, 0.16); }
+  [data-profile="herdr"] { --accent: var(--green); --accent-soft: rgba(47, 208, 122, 0.14); }
+
+  * { box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    margin: 0; background: var(--ink); color: var(--chalk);
+    font-family: var(--sans); font-size: 17px; line-height: 1.6;
+    -webkit-font-smoothing: antialiased; overflow-x: hidden;
+  }
+
+  /* A faint grid, fixed behind everything, so the page reads as an instrument
+     panel rather than a document. Masked out at the edges. */
+  .grid-bg {
+    position: fixed; inset: 0; z-index: 1; pointer-events: none;
+    background-image:
+      linear-gradient(to right, rgba(255,255,255,0.028) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255,255,255,0.028) 1px, transparent 1px);
+    background-size: 72px 72px;
+    mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 30%, transparent 78%);
+  }
+
+  /* Ambient colour, tied to the same system as everything else: each section
+     glows in the colour of what it's about, rather than decorating at random.
+     Kept under 0.1 alpha so type contrast never moves. */
+  section { --glow: transparent; --gx: 18%; --gy: 0%; }
+  section::before {
+    content: ""; position: absolute; inset: -20% 0 0; pointer-events: none; z-index: 0;
+    background: radial-gradient(46% 55% at var(--gx) var(--gy), var(--glow), transparent 72%);
+    transition: background .5s var(--ease);
+  }
+  #profiles { --glow: color-mix(in srgb, var(--accent) 9%, transparent); --gx: 78%; --gy: 12%; }
+  #receipts { --glow: rgba(47, 208, 122, 0.075); --gx: 12%; --gy: 20%; }
+  #limits   { --glow: rgba(255, 59, 48, 0.07);  --gx: 84%; --gy: 18%; }
+  #appwin   { --glow: rgba(46, 107, 255, 0.08); --gx: 22%; --gy: 16%; }
+  #install  { --glow: rgba(255, 122, 0, 0.06);  --gx: 80%; --gy: 22%; }
+
+  /* All four colours, fixed behind the whole page, drifting slowly out of sync
+     so no two ever line up the same way twice. Fixed rather than per-section so
+     the colour is continuous as you scroll instead of restarting at each edge. */
+  .aurora { position: fixed; inset: -12vh -10vw; z-index: 0; pointer-events: none; overflow: hidden; }
+  .aurora i { position: absolute; display: block; border-radius: 50%;
+              filter: blur(100px); will-change: transform; }
+  .aurora i.a { width: 46vw; height: 46vw; left: -8vw; top: -10vh; background: var(--accent);
+                opacity: .20; animation: drift1 24s ease-in-out infinite alternate; }
+  .aurora i.b { width: 38vw; height: 38vw; right: -4vw; top: 14vh; background: var(--blue);
+                opacity: .16; animation: drift2 29s ease-in-out infinite alternate; }
+  .aurora i.c { width: 42vw; height: 42vw; left: 6vw; bottom: -8vh; background: var(--green);
+                opacity: .12; animation: drift3 34s ease-in-out infinite alternate; }
+  .aurora i.d { width: 34vw; height: 34vw; right: 8vw; bottom: -12vh; background: var(--red);
+                opacity: .12; animation: drift4 27s ease-in-out infinite alternate; }
+  @keyframes drift1 { to { transform: translate3d(7vw, 6vh, 0) scale(1.14); } }
+  @keyframes drift2 { to { transform: translate3d(-6vw, 9vh, 0) scale(1.1); } }
+  @keyframes drift3 { to { transform: translate3d(9vw, -7vh, 0) scale(1.08); } }
+  @keyframes drift4 { to { transform: translate3d(-8vw, -5vh, 0) scale(1.16); } }
+
+  /* Sections sit on a translucent ground so the field shows through, rather
+     than a solid black that would wipe it out below the fold. */
+  .stat, .prof, .cell { background: rgba(8, 8, 8, 0.72); backdrop-filter: blur(6px); }
+  .terminal, .window, .stage, .cmd, .tabs { backdrop-filter: blur(10px); }
+  .terminal, .window { background: rgba(8, 8, 8, 0.78); }
+  .cmd, .tabs { background: rgba(10, 10, 10, 0.7); }
+
+  .wrap { max-width: 68rem; margin: 0 auto; padding: 0 var(--pad); position: relative; z-index: 2; }
+  section { border-top: 1px solid var(--line-2); position: relative; z-index: 2; }
+  .band { padding: clamp(3.5rem, 9vw, 7rem) 0; }
+
+  h1, h2 { margin: 0; text-wrap: balance; font-weight: 700; }
+  h1 { font-size: clamp(2.5rem, 7.5vw, 5.2rem); line-height: 0.98; letter-spacing: -0.045em; max-width: 15ch; }
+  h2 { font-size: clamp(1.6rem, 3.6vw, 2.5rem); line-height: 1.06; letter-spacing: -0.032em; max-width: 19ch; }
+  p { margin: 0; max-width: 35rem; }
+
+  .eyebrow { font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.24em;
+             text-transform: uppercase; color: var(--fog-dim); margin: 0; }
+  .lede { font-size: clamp(1.05rem, 1.6vw, 1.2rem); color: var(--fog); }
+  .fine { font-size: 0.85rem; color: var(--fog-dim); }
+  .stack { display: flex; flex-direction: column; align-items: flex-start; gap: 1.2rem; }
+
+  /* ---------------------------------------------------------------- nav */
+  nav {
+    position: sticky; top: 0; z-index: 40;
+    background: rgba(0,0,0,0.72); backdrop-filter: blur(14px) saturate(1.4);
+    -webkit-backdrop-filter: blur(14px) saturate(1.4);
+    border-bottom: 1px solid transparent; transition: border-color .3s var(--ease);
+  }
+  nav.stuck { border-bottom-color: var(--line-2); }
+  .nav-in { display: flex; align-items: center; gap: 0.65rem; padding: 0.85rem 0; }
+  .wordmark { display: inline-flex; gap: 0.32em; font-size: 0.95rem; font-weight: 700; letter-spacing: 0.01em; }
+  .wm { display: flex; flex-direction: column; gap: 0.3em; }
+  .wm i { height: 2px; border-radius: 1px; background: var(--fog); display: block;
+          transition: background .3s var(--ease); }
+  .wm.lit i { background: var(--accent); }
+  .nav-cta { margin-left: auto; display: flex; align-items: center; gap: 1.25rem; }
+  .nav-link { font-size: 0.86rem; color: var(--fog); text-decoration: none; transition: color .2s; }
+  .nav-link:hover { color: var(--chalk); }
+  .btn {
+    font-size: 0.84rem; font-weight: 600; letter-spacing: -0.01em;
+    background: var(--accent); color: #000; border: 0; border-radius: 7px;
+    padding: 0.5rem 0.95rem; cursor: pointer; text-decoration: none;
+    transition: transform .18s var(--ease), filter .18s var(--ease), background .3s var(--ease);
+  }
+  .btn:hover { transform: translateY(-1px); filter: brightness(1.12); }
+  .btn:active { transform: translateY(0); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+  /* ---------------------------------------------------------------- reveal */
+  .rv { opacity: 0; transform: translateY(18px); transition: opacity .7s var(--ease), transform .7s var(--ease); }
+  .rv.in { opacity: 1; transform: none; }
+  .rv.d1 { transition-delay: .07s; } .rv.d2 { transition-delay: .14s; }
+  .rv.d3 { transition-delay: .21s; } .rv.d4 { transition-delay: .28s; }
+
+  /* ---------------------------------------------------------------- hero */
+  .hero { padding: clamp(3rem, 8vw, 5.5rem) 0 clamp(2.5rem, 6vw, 4rem); }
+  .hero-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.02fr);
+               gap: clamp(2rem, 5vw, 4rem); align-items: center; }
+  @media (max-width: 900px) { .hero-grid { grid-template-columns: 1fr; } }
+
+  .hero h1 span.key {
+    color: var(--accent); white-space: nowrap;
+    /* Wiped in rather than underlined. A rule under a word in a headline reads
+       as a hyperlink, which is the one thing it must not look like. */
+    clip-path: inset(0 100% 0 0);
+    animation: wipe .85s var(--ease) .35s forwards;
+  }
+  @keyframes wipe { to { clip-path: inset(0 -0.08em 0 0); } }
+
+  .cmd { display: flex; border: 1px solid var(--line); background: var(--ink-2);
+         border-radius: 9px; overflow: hidden; width: 100%; max-width: 34rem; }
+  .cmd code { font-family: var(--mono); font-size: 0.8rem; color: var(--chalk);
+              padding: 0.8rem 0.95rem; overflow-x: auto; white-space: nowrap; flex: 1; }
+  .cmd code::before { content: "$ "; color: var(--accent); }
+  .copy { font-family: var(--sans); font-size: 0.78rem; font-weight: 600; color: #000;
+          background: var(--accent); border: 0; padding: 0 1rem; cursor: pointer;
+          transition: filter .18s, background .3s var(--ease); }
+  .copy:hover { filter: brightness(1.12); }
+
+  /* ---------------------------------------------------------------- stats */
+  .stats { position: relative; z-index: 2; display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+           gap: 1px; background: var(--line-2); border-block: 1px solid var(--line-2); }
+  .stat { background: var(--ink); padding: 1.4rem var(--pad); }
+  .stat .n { font-size: clamp(1.6rem, 3vw, 2.1rem); font-weight: 700; letter-spacing: -0.03em;
+             font-variant-numeric: tabular-nums; }
+  .stat .l { font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.14em;
+             text-transform: uppercase; color: var(--fog-dim); margin-top: 0.2rem; }
+
+  /* ---------------------------------------------------------------- pad */
+  .stage { border: 1px solid var(--line); background:
+           radial-gradient(120% 90% at 50% 0%, var(--ink-3), var(--ink-2) 60%);
+           border-radius: 16px; padding: 1.4rem; position: relative; overflow: hidden; }
+  .stage::before {
+    content: ""; position: absolute; inset: -40% 30% auto; height: 60%;
+    background: radial-gradient(closest-side, var(--accent-soft), transparent);
+    opacity: .8; pointer-events: none; transition: background .4s var(--ease);
+  }
+  .pad-figure { width: 100%; height: auto; display: block; position: relative; }
+  .ctl { cursor: pointer; }
+  .ctl:focus { outline: none; }
+  .ctl .hit { fill: transparent; }
+  .ctl .shape { fill: none; stroke: #4a4a4a; stroke-width: 2;
+                transition: stroke .18s var(--ease), fill .18s var(--ease), filter .18s var(--ease); }
+  .ctl .glyph { fill: #4a4a4a; font-family: var(--mono); font-size: 11px; transition: fill .18s var(--ease); }
+  .ctl:hover .shape { stroke: var(--fog); }
+  .ctl.on .shape { stroke: var(--accent); fill: var(--accent-soft); filter: drop-shadow(0 0 6px var(--accent-soft)); }
+  .ctl.on .glyph { fill: var(--accent); }
+  .shell { fill: rgba(255,255,255,0.012); stroke: #1f1f1f; stroke-width: 2; }
+
+  .readout { display: grid; grid-template-columns: 1fr auto; gap: 1rem; align-items: end;
+             margin-top: 1.1rem; padding-top: 1.1rem; border-top: 1px solid var(--line-2); }
+  .readout .name { font-size: 1.15rem; font-weight: 600; letter-spacing: -0.02em; }
+  .readout .what { font-size: 0.9rem; color: var(--fog); }
+  .readout .badge { font-family: var(--mono); font-size: 0.65rem; letter-spacing: 0.14em;
+                    text-transform: uppercase; color: var(--accent); border: 1px solid var(--accent);
+                    border-radius: 999px; padding: 0.25rem 0.6rem; white-space: nowrap; }
+  .logline { font-family: var(--mono); font-size: 0.73rem; color: var(--fog); margin-top: 0.9rem;
+             background: rgba(0,0,0,.45); border-left: 2px solid var(--accent); border-radius: 0 6px 6px 0;
+             padding: 0.6rem 0.75rem; overflow-x: auto; white-space: nowrap; }
+  .logline b { color: var(--accent); font-weight: 400; }
+
+  /* ---------------------------------------------------------------- profiles */
+  .tabs { display: inline-flex; gap: 0.3rem; padding: 0.3rem; border: 1px solid var(--line);
+          border-radius: 11px; background: var(--ink-2); flex-wrap: wrap; }
+  .tabs button { font-size: 0.85rem; font-weight: 600; letter-spacing: -0.01em; color: var(--fog);
+                 background: transparent; border: 0; border-radius: 8px; padding: 0.5rem 0.9rem;
+                 cursor: pointer; display: inline-flex; align-items: center; gap: 0.5rem;
+                 transition: background .22s var(--ease), color .22s var(--ease); }
+  .tabs button:hover { color: var(--chalk); }
+  .tabs button[aria-selected="true"] { background: var(--accent); color: #000; }
+  .tabs .pip { width: 8px; height: 8px; border-radius: 50%; }
+
+  .prof-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+               gap: 1px; background: var(--line-2); border: 1px solid var(--line-2);
+               border-radius: 12px; overflow: hidden; width: 100%; }
+  .prof { background: var(--ink-2); padding: 1.3rem; display: flex; flex-direction: column; gap: 0.6rem; }
+  .prof .k { font-family: var(--mono); font-size: 0.76rem; color: var(--accent); }
+  .prof .v { font-size: 0.96rem; font-weight: 500; }
+  .prof .n { font-size: 0.84rem; color: var(--fog-dim); }
+
+  /* ---------------------------------------------------------------- terminal */
+  .terminal { border: 1px solid var(--line); background: var(--ink-2); border-radius: 12px;
+              font-family: var(--mono); font-size: 0.76rem; line-height: 1.85; overflow: hidden; width: 100%; }
+  .terminal .bar { display: flex; gap: 0.35rem; padding: 0.6rem 0.85rem; border-bottom: 1px solid var(--line-2); }
+  .terminal .bar i { width: 9px; height: 9px; border-radius: 50%; background: var(--line); display: block; }
+  .terminal .out { padding: 0.9rem 1.1rem; min-height: 12.5rem; }
+  .terminal .out div { white-space: pre; opacity: 0; animation: line .3s var(--ease) forwards; }
+  @keyframes line { to { opacity: 1; } }
+  .terminal .t { color: var(--fog-dim); }
+  .terminal .a { color: var(--accent); }
+  .terminal .g { color: var(--green); }
+
+  /* ---------------------------------------------------------------- window */
+  .window { border: 1px solid var(--line); background: var(--ink-2); border-radius: 12px;
+            overflow: hidden; width: 100%; max-width: 33rem;
+            box-shadow: 0 30px 60px -20px rgba(0,0,0,0.9); }
+  .chrome { display: flex; align-items: center; gap: 0.55rem; background: var(--ink-3);
+            padding: 0.6rem 0.85rem; border-bottom: 1px solid var(--line-2); }
+  .chrome .dots { display: flex; gap: 0.35rem; margin-right: 0.25rem; }
+  .chrome .dots i { width: 9px; height: 9px; border-radius: 50%; background: var(--line); display: block; }
+  .chrome .title { font-size: 0.82rem; font-weight: 600; }
+  .window .body { padding: 1.1rem; display: flex; flex-direction: column; gap: 0.55rem;
+                  font-size: 0.9rem; color: var(--fog); }
+  .window .body .lit { color: var(--chalk); display: flex; align-items: center; gap: 0.5rem; }
+  .window .body .pip { width: 8px; height: 8px; border-radius: 50%; background: var(--green);
+                       box-shadow: 0 0 8px var(--green); }
+
+  /* ---------------------------------------------------------------- misc */
+  .layer-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+                gap: 1px; background: var(--line-2); border: 1px solid var(--line-2);
+                border-radius: 12px; overflow: hidden; width: 100%; }
+  .cell { background: var(--ink-2); padding: 1.2rem; display: flex; flex-direction: column; gap: 0.35rem;
+          transition: background .22s var(--ease); }
+  .cell:hover { background: var(--ink-3); }
+  .cell .k { font-family: var(--mono); font-size: 0.78rem; color: var(--accent); }
+  .cell .v { font-size: 0.95rem; }
+  .cell .n { font-size: 0.84rem; color: var(--fog-dim); }
+
+  .steps { display: flex; flex-direction: column; gap: 1.4rem; max-width: 44rem; }
+  .step { display: grid; grid-template-columns: 2.2rem 1fr; gap: 1rem; align-items: start; }
+  .step .num { font-family: var(--mono); font-size: 0.76rem; color: var(--accent);
+               padding-top: 0.22rem; font-variant-numeric: tabular-nums; }
+  code.inline { font-family: var(--mono); font-size: 0.85em; color: var(--chalk);
+                background: var(--ink-3); border-radius: 5px; padding: 0.12em 0.4em; white-space: nowrap; }
+
+  .limits { display: flex; flex-direction: column; gap: 1rem; max-width: 44rem; }
+  .limit { display: grid; grid-template-columns: 1.4rem 1fr; gap: 0.75rem; }
+  .limit .x { color: var(--red); font-family: var(--mono); }
+  .limit p { max-width: 40rem; color: var(--fog); }
+  .limit b { color: var(--chalk); font-weight: 600; }
+
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+  footer { position: relative; z-index: 2; padding: 2.5rem 0 4rem; color: var(--fog-dim); font-size: 0.85rem; }
+  .footer-row { display: flex; flex-wrap: wrap; gap: 1.5rem; justify-content: space-between; align-items: baseline; }
+
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; }
+    .rv { opacity: 1; transform: none; }
+    .aurora i { animation: none !important; }
+  }
+</style>
+
+<div class="aurora" aria-hidden="true"><i class="a"></i><i class="b"></i><i class="c"></i><i class="d"></i></div>
+<div class="grid-bg" aria-hidden="true"></div>
+
+<nav id="nav">
+  <div class="wrap nav-in">
+    <svg width="24" height="24" viewBox="0 0 128 128" aria-hidden="true">
+      <rect width="128" height="128" rx="28" fill="#111" />
+      <circle cx="64" cy="36" r="14" fill="#ff7a00" /><circle cx="92" cy="64" r="14" fill="#2e6bff" />
+      <circle cx="64" cy="92" r="14" fill="#2fd07a" /><circle cx="36" cy="64" r="14" fill="#ff3b30" />
+    </svg>
+    <span class="wordmark" role="img" aria-label="L1R1">
+      <span class="wm lit"><i></i><span>L1</span></span>
+      <span class="wm"><i></i><span>R1</span></span>
+    </span>
+    <span class="nav-cta">
+      <a class="nav-link" href="#profiles">Profiles</a>
+      <a class="nav-link" href="#install">Install</a>
+      <a class="btn" href="https://github.com/guramritart-blip/padctl">Get it</a>
+    </span>
+  </div>
+</nav>
+
+<section class="hero">
+  <div class="wrap hero-grid">
+    <div class="stack">
+      <p class="eyebrow rv">DualSense &rarr; macOS</p>
+      <h1 class="rv d1">Keyboard <span class="key">optional</span>.</h1>
+      <p class="lede rv d2">
+        Your PS5 controller becomes a mouse, a keyboard, and a different set of
+        shortcuts in every app. Cull a wedding. Steer a coding agent. Run your Mac
+        without sitting up.
+      </p>
+      <div class="cmd rv d3">
+        <code id="install-cmd">curl -fsSL https://l1r1.sh | bash</code>
+        <button class="copy" id="copy-btn" type="button">Copy</button>
+      </div>
+      <p class="fine rv d4">Free, open source, one dependency. macOS 13+.</p>
+    </div>
+
+    <div class="stage rv d2">
+      <svg class="pad-figure" viewBox="0 0 420 250" role="group" aria-label="Live controller demo">
+        <path class="shell" d="M96 62 h228 a34 34 0 0 1 34 34 v34 c0 46 -18 84 -44 84 c-20 0 -30 -22 -44 -30 h-120 c-14 8 -24 30 -44 30 c-26 0 -44 -38 -44 -84 v-34 a34 34 0 0 1 34 -34 z" />
+        <g class="ctl" data-id="l2" tabindex="0" role="button" aria-label="L2"><rect class="hit" x="86" y="20" width="60" height="26"/><rect class="shape" x="90" y="22" width="52" height="20" rx="7"/><text class="glyph" x="107" y="37">L2</text></g>
+        <g class="ctl" data-id="r2" tabindex="0" role="button" aria-label="R2"><rect class="hit" x="274" y="20" width="60" height="26"/><rect class="shape" x="278" y="22" width="52" height="20" rx="7"/><text class="glyph" x="295" y="37">R2</text></g>
+        <g class="ctl" data-id="l1" tabindex="0" role="button" aria-label="L1"><rect class="hit" x="86" y="44" width="60" height="24"/><rect class="shape" x="90" y="46" width="52" height="18" rx="7"/><text class="glyph" x="107" y="60">L1</text></g>
+        <g class="ctl" data-id="r1" tabindex="0" role="button" aria-label="R1"><rect class="hit" x="274" y="44" width="60" height="24"/><rect class="shape" x="278" y="46" width="52" height="18" rx="7"/><text class="glyph" x="295" y="60">R1</text></g>
+        <g class="ctl" data-id="dpad" tabindex="0" role="button" aria-label="D-pad"><rect class="hit" x="76" y="82" width="64" height="64"/><path class="shape" d="M100 86 h16 v16 h16 v16 h-16 v16 h-16 v-16 h-16 v-16 h16 z"/></g>
+        <g class="ctl" data-id="north" tabindex="0" role="button" aria-label="Triangle"><rect class="hit" x="288" y="76" width="34" height="30"/><circle class="shape" cx="305" cy="91" r="13"/><text class="glyph" x="301" y="96">&#9651;</text></g>
+        <g class="ctl" data-id="west" tabindex="0" role="button" aria-label="Square"><rect class="hit" x="264" y="100" width="34" height="30"/><circle class="shape" cx="281" cy="115" r="13"/><text class="glyph" x="277" y="120">&#9633;</text></g>
+        <g class="ctl" data-id="east" tabindex="0" role="button" aria-label="Circle"><rect class="hit" x="312" y="100" width="34" height="30"/><circle class="shape" cx="329" cy="115" r="13"/><text class="glyph" x="325" y="120">&#9711;</text></g>
+        <g class="ctl" data-id="south" tabindex="0" role="button" aria-label="Cross"><rect class="hit" x="288" y="124" width="34" height="30"/><circle class="shape" cx="305" cy="139" r="13"/><text class="glyph" x="301" y="144">&#10005;</text></g>
+        <g class="ctl" data-id="touchpad" tabindex="0" role="button" aria-label="Touchpad"><rect class="hit" x="158" y="74" width="104" height="62"/><rect class="shape" x="162" y="78" width="96" height="54" rx="8"/></g>
+        <g class="ctl" data-id="lstick" tabindex="0" role="button" aria-label="Left stick"><rect class="hit" x="146" y="146" width="60" height="60"/><circle class="shape" cx="176" cy="176" r="26"/><circle class="shape" cx="176" cy="176" r="15"/></g>
+        <g class="ctl" data-id="rstick" tabindex="0" role="button" aria-label="Right stick"><rect class="hit" x="214" y="146" width="60" height="60"/><circle class="shape" cx="244" cy="176" r="26"/><circle class="shape" cx="244" cy="176" r="15"/></g>
+      </svg>
+
+      <div class="readout">
+        <div>
+          <div class="name" id="ro-name">Cross</div>
+          <div class="what" id="ro-what">Tap to click. Hold and move the stick to drag.</div>
+        </div>
+        <span class="badge" id="ro-badge">Warp</span>
+      </div>
+      <div class="logline"><span id="ro-log">[16:03:31] south [front=dev.warp.Warp-Stable] -&gt; <b>hold left</b></span></div>
+    </div>
+  </div>
+</section>
+
+<div class="stats">
+  <div class="stat rv"><div class="n" data-count="33">0</div><div class="l">Controls</div></div>
+  <div class="stat rv d1"><div class="n" data-count="1">0</div><div class="l">Dependency</div></div>
+  <div class="stat rv d2"><div class="n" data-count="16" data-suffix="ms">0</div><div class="l">Poll interval</div></div>
+  <div class="stat rv d3"><div class="n" data-count="0">0</div><div class="l">Telemetry</div></div>
+</div>
+
+<section class="band" id="profiles">
+  <div class="wrap stack">
+    <p class="eyebrow rv">Profiles</p>
+    <h2 class="rv d1">A different controller in every app.</h2>
+    <p class="lede rv d2">
+      L1R1 watches which app is in front and swaps the whole layout. Same pad,
+      three completely different machines. Try one.
+    </p>
+
+    <div class="tabs rv d3" role="tablist" aria-label="Profiles">
+      <button role="tab" data-profile="warp" aria-selected="true">
+        <span class="pip" style="background: var(--orange)"></span>Warp</button>
+      <button role="tab" data-profile="lightroom" aria-selected="false">
+        <span class="pip" style="background: var(--blue)"></span>Lightroom</button>
+      <button role="tab" data-profile="herdr" aria-selected="false">
+        <span class="pip" style="background: var(--green)"></span>herdr</button>
+    </div>
+
+    <div class="prof-grid rv d3" id="prof-grid"></div>
+    <p class="fine rv d4" id="prof-needs">Works with any terminal.</p>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap stack">
+    <p class="eyebrow rv">The layer</p>
+    <h2 class="rv d1">Hold L1. Everything changes.</h2>
+    <p class="lede rv d1" style="margin-bottom: -0.4rem;">L1 isn't a button. It's a shift key.</p>
+    <p class="lede rv d2">
+      Hold it and every control means something else. Twenty-four controls doing
+      forty-eight things, from a device with no keys.
+    </p>
+    <div class="layer-grid rv d3">
+      <div class="cell"><span class="k">L1 + &#10005;</span><span class="v">Paste</span><span class="n">System-wide, not just the terminal</span></div>
+      <div class="cell"><span class="k">L1 + &#9711;</span><span class="v">Copy</span><span class="n">cmd+c, which is not the ctrl+c below it</span></div>
+      <div class="cell"><span class="k">L1 + &#9633;</span><span class="v">Clear the agent's context</span><span class="n">Typed into the focused pane</span></div>
+      <div class="cell"><span class="k">L1 + &#9651;</span><span class="v">Start dictating</span><span class="n">Opens your voice input app</span></div>
+      <div class="cell"><span class="k">L1 + stick &#8593;</span><span class="v">"Review this diff"</span><span class="n">A whole prompt on one flick</span></div>
+      <div class="cell"><span class="k">L2 + R2</span><span class="v">Screenshot to clipboard</span><span class="n">Held 250ms, so it can't misfire</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="band" id="receipts">
+  <div class="wrap stack">
+    <p class="eyebrow rv">Receipts</p>
+    <h2 class="rv d1">It tells you exactly what it did.</h2>
+    <p class="lede rv d2">
+      Every press, the app it landed in, and the action it resolved to. When a
+      binding misbehaves you read a line, you don't guess.
+    </p>
+    <div class="terminal rv d3">
+      <div class="bar"><i></i><i></i><i></i></div>
+      <div class="out" id="term-out"></div>
+    </div>
+  </div>
+</section>
+
+<section class="band" id="appwin">
+  <div class="wrap stack">
+    <p class="eyebrow rv">The app</p>
+    <h2 class="rv d1">It comes with a window.</h2>
+    <p class="lede rv d2">
+      Not a config file you edit blind. The daemon serves a real configurator, and
+      you install it as its own window with its own Dock icon.
+    </p>
+    <div class="window rv d3">
+      <div class="chrome">
+        <span class="dots"><i></i><i></i><i></i></span>
+        <svg width="15" height="15" viewBox="0 0 128 128" aria-hidden="true">
+          <rect width="128" height="128" rx="28" fill="#111" />
+          <circle cx="64" cy="36" r="14" fill="#ff7a00" /><circle cx="92" cy="64" r="14" fill="#2e6bff" />
+          <circle cx="64" cy="92" r="14" fill="#2fd07a" /><circle cx="36" cy="64" r="14" fill="#ff3b30" />
+        </svg>
+        <span class="title">L1R1</span>
+      </div>
+      <div class="body">
+        <div class="lit"><span class="pip"></span> Controller connected</div>
+        <div>Press a button on the pad and it selects here.</div>
+        <div>Click a shortcut field, then press the keys you want.</div>
+      </div>
+    </div>
+    <p class="lede rv d4">
+      What doesn't exist yet is a <code class="inline">.dmg</code>: a signed
+      download with no terminal anywhere. That's a notarisation fee and a wrapper,
+      and it gets built when enough people ask.
+    </p>
+    <p class="rv d4"><a href="mailto:guramrit.art@gmail.com?subject=L1R1">Tell me you want the download &rarr;</a></p>
+  </div>
+</section>
+
+<section class="band" id="install">
+  <div class="wrap stack">
+    <p class="eyebrow rv">Installing</p>
+    <h2 class="rv d1">Four steps, and one of them is Apple's fault.</h2>
+    <div class="steps rv d2">
+      <div class="step"><span class="num">01</span>
+        <p>Run the command. It builds the native HID module and the mouse driver on your machine, writes a LaunchAgent, and starts the daemon.</p></div>
+      <div class="step"><span class="num">02</span>
+        <p>Grant <b>Accessibility</b> and <b>Input Monitoring</b> to <code class="inline">~/padctl/bin/node</code>. macOS grants these per binary path, which is why the installer freezes its own copy of node rather than using the one Homebrew might upgrade out from under you.</p></div>
+      <div class="step"><span class="num">03</span>
+        <p>Pair the controller. Hold PS and Create until the light bar flashes.</p></div>
+      <div class="step"><span class="num">04</span>
+        <p>The configurator opens by itself. Press a button and it selects there.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="band" id="limits">
+  <div class="wrap stack">
+    <p class="eyebrow rv">Before you install it</p>
+    <h2 class="rv d1">What it doesn't do.</h2>
+    <div class="limits rv d2">
+      <div class="limit"><span class="x">&mdash;</span>
+        <p><b>It can't grant its own permissions.</b> Nothing on macOS can. Any tool claiming one-click setup for this is either lying or shipping a kernel extension.</p></div>
+      <div class="limit"><span class="x">&mdash;</span>
+        <p><b>It's a DualSense driver.</b> The HID report is decoded by hand for that pad, which is also why it's called L1R1. Other controllers need their own decoder.</p></div>
+      <div class="limit"><span class="x">&mdash;</span>
+        <p><b>The agent profile needs herdr.</b> Sending prompts to a specific pane goes through it. Without herdr you still get the mouse, the clipboard and every system-wide shortcut.</p></div>
+      <div class="limit"><span class="x">&mdash;</span>
+        <p><b>It is not a game remapper.</b> If you want to play keyboard-only games with a pad, older tools do that better.</p></div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap footer-row">
+    <span>Built because the keyboard was four feet away.</span>
+    <span><a href="https://github.com/guramritart-blip/padctl">Source on GitHub</a></span>
+  </div>
+</footer>
+
+<script>
+(() => {
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  // ---------------------------------------------------------------- profiles
+  const PROFILES = {
+    warp: {
+      badge: "Warp", needs: "Works with any terminal.",
+      rows: [["R2", "Enter", "Straight into the focused pane"],
+             ["D-pad", "History, held to repeat", "400ms, then every 60ms"],
+             ["L1 + O", "Copy", "cmd+c, system-wide"],
+             ["L1 + X", "Paste", "Anywhere, not just here"]],
+      demo: [["south", "Cross", "Tap to click. Hold and move the stick to drag.",
+              '[16:03:31] south [front=dev.warp.Warp-Stable] -&gt; <b>hold left</b>'],
+             ["r2", "R2", "Enter, sent to the focused pane.",
+              '[16:03:33] r2 [front=dev.warp.Warp-Stable] -&gt; <b>keys enter @ w4:p2</b>'],
+             ["east", "Circle", "Escape. Hold it and it repeats.",
+              '[16:03:36] east [front=dev.warp.Warp-Stable] -&gt; <b>keys esc @ w4:p2</b>'],
+             ["l1", "L1", "The layer. Everything below changes meaning.",
+              '[16:03:38] l1 held -&gt; <b>layer active</b>']]
+    },
+    lightroom: {
+      badge: "Lightroom", needs: "Lightroom Classic. Ships as a preset, fully editable.",
+      rows: [["D-pad", "Previous / next photo", "Hold to run the filmstrip"],
+             ["✕", "Flag as pick", "The P key, without reaching"],
+             ["○", "Reject", "X, and it repeats if held"],
+             ["L1 + face", "Star ratings", "One to five, one thumb"]],
+      demo: [["dpad", "D-pad", "Previous and next photo, held to run.",
+              '[16:04:02] dpad_right [desktop:com.adobe.Lightroom] -&gt; <b>hotkey right</b>'],
+             ["south", "Cross", "Flag as a pick.",
+              '[16:04:03] south [desktop:com.adobe.Lightroom] -&gt; <b>hotkey p</b>'],
+             ["east", "Circle", "Reject.",
+              '[16:04:05] east [desktop:com.adobe.Lightroom] -&gt; <b>hotkey x</b>'],
+             ["rstick", "Right stick", "Pan while zoomed in.",
+              '[16:04:07] rstick -&gt; <b>scroll -12 4</b>']]
+    },
+    herdr: {
+      badge: "herdr", needs: "Needs herdr for pane targeting.",
+      rows: [["L2", "Next workspace", "Cycles your agent sessions"],
+             ["Stick flick", "A saved prompt", "Whole instructions on one flick"],
+             ["L1 + □", "Clear its context", "Typed, then submitted"],
+             ["View / Options", "Focus pane left / right", "herdr pane focus"]],
+      demo: [["l2", "L2", "Next workspace.",
+              '[16:05:11] l2 -&gt; <b>workspace -&gt; 12. Aptitude</b>'],
+             ["lstick", "Left stick", "Flick up to send a whole saved prompt.",
+              '[16:05:14] L1+lstick_up -&gt; <b>text "Review this diff..."</b>'],
+             ["west", "Square", "Clear the agent's context.",
+              '[16:05:19] L1+west -&gt; <b>text "/clear"</b>'],
+             ["r1", "R1", "Compact instead of clearing.",
+              '[16:05:22] L1+r1 -&gt; <b>text "/compact"</b>']]
+    }
+  };
+
+  const root = document.documentElement;
+  const els = {
+    name: document.getElementById("ro-name"),
+    what: document.getElementById("ro-what"),
+    log: document.getElementById("ro-log"),
+    badge: document.getElementById("ro-badge"),
+    grid: document.getElementById("prof-grid"),
+    needs: document.getElementById("prof-needs")
+  };
+  const controls = Array.from(document.querySelectorAll(".ctl"));
+  const byId = (id) => document.querySelector('.ctl[data-id="' + id + '"]');
+
+  let profile = "warp";
+  let step = 0;
+  let timer = null;
+  let paused = false;
+
+  function light(id) {
+    controls.forEach((c) => c.classList.toggle("on", c.dataset.id === id));
+  }
+
+  function render([id, name, what, log]) {
+    light(id);
+    els.name.textContent = name;
+    els.what.textContent = what;
+    els.log.innerHTML = log;
+  }
+
+  function tick() {
+    if (paused) return;
+    const demo = PROFILES[profile].demo;
+    render(demo[step % demo.length]);
+    step += 1;
+    timer = setTimeout(tick, 2200);
+  }
+
+  function renderProfile(key) {
+    profile = key;
+    step = 0;
+    root.setAttribute("data-profile", key);
+    const p = PROFILES[key];
+    els.badge.textContent = p.badge;
+    els.needs.textContent = p.needs;
+    els.grid.innerHTML = "";
+    p.rows.forEach(([k, v, n]) => {
+      const cell = document.createElement("div");
+      cell.className = "prof";
+      cell.innerHTML = '<span class="k"></span><span class="v"></span><span class="n"></span>';
+      cell.querySelector(".k").textContent = k;
+      cell.querySelector(".v").textContent = v;
+      cell.querySelector(".n").textContent = n;
+      els.grid.appendChild(cell);
+    });
+    clearTimeout(timer);
+    if (!reduce) tick(); else render(p.demo[0]);
+  }
+
+  document.querySelectorAll('[role="tab"]').forEach((btn) => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll('[role="tab"]').forEach((b) =>
+        b.setAttribute("aria-selected", String(b === btn)));
+      renderProfile(btn.dataset.profile);
+    });
+  });
+
+  // Touching the pad takes over from the demo, and hands it back when idle.
+  let resume = null;
+  function takeOver(id) {
+    const demo = PROFILES[profile].demo;
+    const found = demo.find((d) => d[0] === id);
+    paused = true;
+    clearTimeout(timer);
+    if (found) render(found);
+    else { light(id); els.name.textContent = id; els.what.textContent = "Unbound in this profile."; }
+    clearTimeout(resume);
+    resume = setTimeout(() => { paused = false; if (!reduce) tick(); }, 5000);
+  }
+  controls.forEach((c) => {
+    c.addEventListener("mouseenter", () => takeOver(c.dataset.id));
+    c.addEventListener("focus", () => takeOver(c.dataset.id));
+    c.addEventListener("click", () => takeOver(c.dataset.id));
+  });
+
+  renderProfile("warp");
+
+  // ---------------------------------------------------------------- reveals
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach((e) => { if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); } });
+  }, { rootMargin: "0px 0px -8% 0px", threshold: 0.15 });
+  document.querySelectorAll(".rv").forEach((el) => io.observe(el));
+
+  // ---------------------------------------------------------------- counters
+  const counters = new IntersectionObserver((entries) => {
+    entries.forEach((e) => {
+      if (!e.isIntersecting) return;
+      const el = e.target;
+      counters.unobserve(el);
+      const to = Number(el.dataset.count);
+      const suffix = el.dataset.suffix ?? "";
+      if (reduce || to === 0) { el.textContent = to + suffix; return; }
+      const started = performance.now();
+      const run = (now) => {
+        const t = Math.min(1, (now - started) / 900);
+        el.textContent = Math.round(to * (1 - Math.pow(1 - t, 3))) + suffix;
+        if (t < 1) requestAnimationFrame(run);
+      };
+      requestAnimationFrame(run);
+    });
+  }, { threshold: 0.6 });
+  document.querySelectorAll("[data-count]").forEach((el) => counters.observe(el));
+
+  // ---------------------------------------------------------------- terminal
+  const LINES = [
+    ['<span class="t">[16:03:20]</span> <span class="g">controller connected</span>', 0],
+    ['<span class="t">[16:03:22]</span> <span class="g">accessibility OK</span>', 220],
+    ['<span class="t">[16:03:31]</span> south [front=dev.warp.Warp-Stable] -&gt; <span class="a">hold left</span>', 520],
+    ['<span class="t">[16:03:33]</span> south -&gt; <span class="a">release left</span>', 760],
+    ['<span class="t">[16:03:34]</span> L1+east -&gt; <span class="a">hotkey c (command down)</span>', 980],
+    ['<span class="t">[16:04:03]</span> south [desktop:com.adobe.Lightroom] -&gt; <span class="a">hotkey p</span>', 1240],
+    ['<span class="t">[16:04:47]</span> l2+r2 -&gt; <span class="a">hotkey 2 (command down, shift down)</span>', 1500]
+  ];
+  const out = document.getElementById("term-out");
+  const termIO = new IntersectionObserver((entries) => {
+    entries.forEach((e) => {
+      if (!e.isIntersecting) return;
+      termIO.unobserve(e.target);
+      LINES.forEach(([html, delay]) => {
+        const d = document.createElement("div");
+        d.innerHTML = html;
+        d.style.animationDelay = (reduce ? 0 : delay) + "ms";
+        out.appendChild(d);
+      });
+    });
+  }, { threshold: 0.3 });
+  termIO.observe(out);
+
+  // ---------------------------------------------------------------- chrome
+  const nav = document.getElementById("nav");
+  addEventListener("scroll", () => nav.classList.toggle("stuck", scrollY > 8), { passive: true });
+
+  const btn = document.getElementById("copy-btn");
+  btn.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(document.getElementById("install-cmd").textContent);
+      btn.textContent = "Copied";
+    } catch { btn.textContent = "Select it"; }
+    setTimeout(() => { btn.textContent = "Copy"; }, 1800);
+  });
+})();
+</script>

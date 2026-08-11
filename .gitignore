@@ -16,4 +16,6 @@ padctl.log
 # My own is committed at configs/g.json if you want it as a starting point.
 config.json
 config.json.bak
-site/
+
+# The built .app, 72MB and rebuilt by scripts/build-app.sh
+build/

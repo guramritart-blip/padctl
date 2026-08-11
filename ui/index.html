@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>padctl</title>
+<title>L1R1</title>
 <link rel="manifest" href="/manifest.webmanifest" />
 <link rel="apple-touch-icon" href="/icon-192.png" />
 <link rel="icon" href="/icon-192.png" />
@@ -12,127 +12,203 @@
 <meta name="apple-mobile-web-app-title" content="padctl" />
 <style>
   :root {
-    --ink: #06110f; --ink-2: #0b1a17; --ink-3: #0f2320; --line: #16302b;
-    --fog: #7e9a93; --fog-dim: #55706a; --chalk: #e6efea;
-    --amber: #ff9a3c; --red: #ff6b5a; --green: #4bd6a8;
+    --ink: #000000; --ink-2: #0b0b0b; --ink-3: #141414;
+    --line: #242424; --line-2: #1a1a1a;
+    --fog: #8a8a8a; --fog-dim: #5c5c5c; --chalk: #f4f4f4;
+    --orange: #ff7a00; --blue: #2e6bff; --green: #2fd07a; --red: #ff3b30;
+
+    /* The table you're editing colours the whole app, same four-colour system
+       the marketing uses. Base is orange, the layer is blue, desktop is green. */
+    --accent: var(--orange);
+    --accent-soft: rgba(255,122,0,.14);
+
+    --sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",
+            system-ui, "Helvetica Neue", sans-serif;
     --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
-    --body: ui-sans-serif, system-ui, -apple-system, "Helvetica Neue", sans-serif;
+    --ease: cubic-bezier(0.16, 1, 0.3, 1);
   }
+  [data-table="l1_bindings"] { --accent: var(--blue); --accent-soft: rgba(46,107,255,.16); }
+  [data-table="desktop_bindings"] { --accent: var(--green); --accent-soft: rgba(47,208,122,.14); }
+
   * { box-sizing: border-box; }
   body {
     margin: 0; background: var(--ink); color: var(--chalk);
-    font-family: var(--body); font-size: 15px; line-height: 1.55;
-    -webkit-font-smoothing: antialiased;
+    font-family: var(--sans); font-size: 15px; line-height: 1.55;
+    -webkit-font-smoothing: antialiased; min-height: 100vh;
   }
-  .wrap { max-width: 74rem; margin: 0 auto; padding: 1.5rem clamp(1rem, 3vw, 2.5rem) 4rem; }
 
-  header { display: flex; align-items: baseline; gap: 1rem; flex-wrap: wrap;
-           border-bottom: 1px solid var(--line); padding-bottom: 1rem; margin-bottom: 1.5rem; }
-  .mark { font-family: var(--mono); letter-spacing: 0.3em; text-transform: uppercase; font-size: 0.85rem; }
-  .status { font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.1em;
-            text-transform: uppercase; color: var(--fog-dim); margin-left: auto; display: flex; gap: 1rem; }
-  .dot { color: var(--red); }
-  .dot.live { color: var(--green); }
+  /* Same drifting colour field as the site, dialled down: this is a tool you
+     stare at, not a page you skim. */
+  .aurora { position: fixed; inset: -10vh -10vw; z-index: 0; pointer-events: none; overflow: hidden; }
+  .aurora i { position: absolute; border-radius: 50%; filter: blur(110px); display: block; will-change: transform; }
+  .aurora i.a { width: 44vw; height: 44vw; left: -10vw; top: -12vh; background: var(--accent); opacity: .13;
+                animation: d1 26s ease-in-out infinite alternate; transition: background .45s var(--ease); }
+  .aurora i.b { width: 34vw; height: 34vw; right: -6vw; bottom: -10vh; background: var(--blue); opacity: .10;
+                animation: d2 31s ease-in-out infinite alternate; }
+  @keyframes d1 { to { transform: translate3d(6vw,5vh,0) scale(1.12); } }
+  @keyframes d2 { to { transform: translate3d(-5vw,-6vh,0) scale(1.1); } }
 
-  .cols { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 2rem; align-items: start; }
-  @media (max-width: 900px) { .cols { grid-template-columns: 1fr; } }
+  .wrap { position: relative; z-index: 1; max-width: 76rem; margin: 0 auto;
+          padding: 1.25rem clamp(1rem,3vw,2.5rem) 4rem; }
 
-  .tabs { display: flex; gap: 0; border: 1px solid var(--line); width: fit-content; margin-bottom: 1rem; }
-  .tabs button {
-    font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase;
-    background: transparent; border: 0; border-right: 1px solid var(--line);
-    color: var(--fog); padding: 0.55rem 0.9rem; cursor: pointer;
-  }
-  .tabs button:last-child { border-right: 0; }
-  .tabs button[aria-selected="true"] { background: var(--amber); color: var(--ink); }
-  .tabs button:focus-visible { outline: 2px solid var(--chalk); outline-offset: -3px; }
+  header { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;
+           border-bottom: 1px solid var(--line-2); padding-bottom: 1rem; margin-bottom: 1.5rem; }
+  .wordmark { display: inline-flex; gap: 0.32em; font-size: 0.95rem; font-weight: 700; }
+  .wm { display: flex; flex-direction: column; gap: 0.3em; }
+  .wm i { height: 2px; border-radius: 1px; background: var(--fog); display: block; transition: background .3s var(--ease); }
+  .wm.lit i { background: var(--accent); }
+  .status { margin-left: auto; display: flex; gap: 1.1rem; font-family: var(--mono);
+            font-size: 0.7rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--fog-dim); }
+  .dot { color: var(--red); } .dot.live { color: var(--green); }
+
+  .cols { display: grid; grid-template-columns: 13rem minmax(0,1.05fr) minmax(0,0.95fr);
+          gap: 1.35rem; align-items: start; }
+  @media (max-width: 1180px) { .cols { grid-template-columns: 12rem minmax(0,1fr); } .rail { grid-row: span 2; } }
+  @media (max-width: 860px) { .cols { grid-template-columns: 1fr; } .rail { grid-row: auto; } }
+
+  .rail { border: 1px solid var(--line); background: rgba(8,8,8,.72); backdrop-filter: blur(10px);
+          border-radius: 14px; padding: 0.9rem; position: sticky; top: 1rem; }
+  .rail h2 { font-family: var(--mono); font-size: 0.66rem; letter-spacing: 0.18em; text-transform: uppercase;
+             color: var(--fog-dim); margin: 0 0 0.7rem; font-weight: 400; }
+  .rail-item { width: 100%; text-align: left; display: flex; align-items: center; gap: 0.55rem;
+               background: transparent; border: 1px solid transparent; border-radius: 9px; color: var(--fog);
+               font-family: var(--sans); font-size: 0.86rem; font-weight: 500; padding: 0.5rem 0.6rem;
+               cursor: pointer; transition: background .18s var(--ease), color .18s var(--ease); }
+  .rail-item:hover { background: rgba(255,255,255,.04); color: var(--chalk); }
+  .rail-item[aria-current="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--chalk); }
+  .rail-item .swatch { width: 9px; height: 9px; border-radius: 50%; background: var(--fog-dim); flex: none; }
+  .rail-item .count { margin-left: auto; font-family: var(--mono); font-size: 0.66rem; color: var(--fog-dim); }
+  .rail-item .now { width: 6px; height: 6px; border-radius: 50%; background: var(--green);
+                    box-shadow: 0 0 7px var(--green); flex: none; }
+  .rail-item.off { opacity: .45; }
+
+  /* A control the profile doesn't override still fires, it just comes from the
+     global table. Dashed so you can see what you'd be shadowing. */
+  .ctl.inherited .shape { stroke-dasharray: 4 3; stroke: #4a4a4a; }
+  .ctl.inherited .glyph { fill: #4a4a4a; }
+
+  .tabs { display: inline-flex; gap: 0.25rem; padding: 0.25rem; margin-bottom: 1rem;
+          border: 1px solid var(--line); border-radius: 11px; background: rgba(10,10,10,.7);
+          backdrop-filter: blur(10px); }
+  .tabs button { font-family: var(--sans); font-size: 0.82rem; font-weight: 600; color: var(--fog);
+                 background: transparent; border: 0; border-radius: 8px; padding: 0.45rem 0.85rem;
+                 cursor: pointer; transition: background .2s var(--ease), color .2s var(--ease); }
+  .tabs button:hover { color: var(--chalk); }
+  .tabs button[aria-selected="true"] { background: var(--accent); color: #000; }
 
   svg.pad { width: 100%; height: auto; display: block; }
   .ctl { cursor: pointer; }
   .ctl:focus { outline: none; }
   .ctl .hit { fill: transparent; }
-  .ctl .shape { fill: none; stroke: var(--fog-dim); stroke-width: 2; transition: stroke .12s, fill .12s; }
-  .ctl .glyph { fill: var(--fog-dim); font-family: var(--mono); font-size: 11px; transition: fill .12s; }
+  .ctl .shape { fill: none; stroke: #3d3d3d; stroke-width: 2;
+                transition: stroke .16s var(--ease), fill .16s var(--ease), filter .16s var(--ease); }
+  .ctl .glyph { fill: #3d3d3d; font-family: var(--mono); font-size: 11px; transition: fill .16s var(--ease); }
   .ctl.bound .shape { stroke: var(--fog); }
   .ctl.bound .glyph { fill: var(--fog); }
-  .ctl:hover .shape, .ctl.sel .shape { stroke: var(--amber); }
-  .ctl:hover .glyph, .ctl.sel .glyph { fill: var(--amber); }
-  .ctl.sel .shape { fill: rgba(255,154,60,.13); }
-  .ctl.down .shape { stroke: var(--green); fill: rgba(75,214,168,.18); }
+  .ctl:hover .shape, .ctl.sel .shape { stroke: var(--accent); }
+  .ctl:hover .glyph, .ctl.sel .glyph { fill: var(--accent); }
+  .ctl.sel .shape { fill: var(--accent-soft); }
+  .ctl.down .shape { stroke: var(--green); fill: rgba(47,208,122,.2);
+                     filter: drop-shadow(0 0 7px rgba(47,208,122,.45)); }
   .ctl.down .glyph { fill: var(--green); }
-  .shell { fill: var(--ink-2); stroke: var(--line); stroke-width: 2; }
+  .shell { fill: rgba(255,255,255,.012); stroke: #1f1f1f; stroke-width: 2; }
 
-  .panel { border: 1px solid var(--line); background: var(--ink-2); padding: 1.1rem; }
+  .panel { border: 1px solid var(--line); background: rgba(8,8,8,.72); backdrop-filter: blur(10px);
+           border-radius: 14px; padding: 1.15rem; }
   .panel + .panel { margin-top: 1rem; }
-  .panel h2 { font-size: 0.72rem; font-family: var(--mono); letter-spacing: 0.18em;
-              text-transform: uppercase; color: var(--fog-dim); margin: 0 0 0.85rem; font-weight: 400; }
+  .panel h2 { font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.18em; text-transform: uppercase;
+              color: var(--fog-dim); margin: 0 0 0.9rem; font-weight: 400; }
 
-  .selname { font-size: 1.35rem; margin: 0 0 0.15rem; }
-  .selid { font-family: var(--mono); font-size: 0.75rem; color: var(--fog-dim); margin: 0 0 1rem; }
+  .selname { font-size: 1.35rem; font-weight: 600; letter-spacing: -0.02em; margin: 0 0 0.1rem; }
+  .selid { font-family: var(--mono); font-size: 0.73rem; color: var(--fog-dim); margin: 0 0 1rem; }
 
-  label { display: block; font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.14em;
+  label { display: block; font-family: var(--mono); font-size: 0.66rem; letter-spacing: 0.14em;
           text-transform: uppercase; color: var(--fog-dim); margin: 0 0 0.35rem; }
   .field { margin-bottom: 0.9rem; }
   select, input[type="text"], textarea {
-    width: 100%; background: var(--ink); color: var(--chalk); border: 1px solid var(--line);
-    font-family: var(--mono); font-size: 0.82rem; padding: 0.5rem 0.6rem; border-radius: 0;
+    width: 100%; background: rgba(0,0,0,.5); color: var(--chalk); border: 1px solid var(--line);
+    border-radius: 9px; font-family: var(--sans); font-size: 0.86rem; padding: 0.6rem 0.7rem;
+    transition: border-color .18s var(--ease);
   }
+  input[type="text"], textarea { font-family: var(--mono); font-size: 0.8rem; }
+  /* Without this macOS paints its own control and ignores everything above. */
+  select {
+    appearance: none; -webkit-appearance: none; padding-right: 2rem; cursor: pointer;
+    background-image: linear-gradient(45deg, transparent 50%, var(--fog) 50%),
+                      linear-gradient(135deg, var(--fog) 50%, transparent 50%);
+    background-position: calc(100% - 1.05rem) 55%, calc(100% - 0.75rem) 55%;
+    background-size: 5px 5px, 5px 5px;
+    background-repeat: no-repeat;
+  }
+  select option { background: #111; color: var(--chalk); }
   textarea { min-height: 5rem; resize: vertical; line-height: 1.5; }
-  select:focus, input:focus, textarea:focus { outline: 1px solid var(--amber); border-color: var(--amber); }
+  select:focus, input:focus, textarea:focus { outline: none; border-color: var(--accent); }
 
-  .capture {
-    width: 100%; text-align: left; background: var(--ink); border: 1px dashed var(--line);
-    color: var(--chalk); font-family: var(--mono); font-size: 0.85rem; padding: 0.7rem;
-    cursor: pointer;
-  }
-  .capture.arm { border-color: var(--amber); border-style: solid; color: var(--amber); }
-  .capture:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+  .capture { width: 100%; text-align: left; background: rgba(0,0,0,.5); border: 1px dashed var(--line);
+             border-radius: 9px; color: var(--chalk); font-family: var(--mono); font-size: 0.85rem;
+             padding: 0.7rem; cursor: pointer; transition: border-color .18s var(--ease), color .18s var(--ease); }
+  .capture:hover { border-color: var(--fog); }
+  .capture.arm { border-color: var(--accent); border-style: solid; color: var(--accent); }
 
   .row { display: flex; gap: 0.5rem; flex-wrap: wrap; }
-  button.act {
-    font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.12em; text-transform: uppercase;
-    border: 1px solid var(--line); background: transparent; color: var(--chalk);
-    padding: 0.55rem 0.9rem; cursor: pointer;
-  }
-  button.act:hover { border-color: var(--amber); color: var(--amber); }
-  button.act.primary { background: var(--amber); color: var(--ink); border-color: var(--amber); }
-  button.act.primary:hover { background: #ffb066; color: var(--ink); }
-  button.act:disabled { opacity: 0.4; cursor: default; }
-  button.act:focus-visible { outline: 2px solid var(--chalk); outline-offset: 2px; }
+  button.act { font-family: var(--sans); font-size: 0.8rem; font-weight: 600; letter-spacing: -0.01em;
+               border: 1px solid var(--line); border-radius: 9px; background: transparent; color: var(--chalk);
+               padding: 0.5rem 0.85rem; cursor: pointer;
+               transition: border-color .18s var(--ease), color .18s var(--ease),
+                           background .18s var(--ease), transform .16s var(--ease); }
+  button.act:hover { border-color: var(--accent); color: var(--accent); }
+  button.act.primary { background: var(--accent); color: #000; border-color: var(--accent); }
+  button.act.primary:hover { filter: brightness(1.12); color: #000; transform: translateY(-1px); }
+  button.act:disabled { opacity: .3; cursor: default; transform: none; filter: grayscale(1); }
+  button.act.quiet { color: var(--fog); }
+  button.act.quiet:hover { border-color: var(--red); color: var(--red); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-  .note { display: grid; grid-template-columns: auto 1fr; gap: 0.6rem; font-size: 0.85rem;
-          color: var(--fog); padding: 0.45rem 0; border-bottom: 1px solid var(--line); }
+  .note { display: grid; grid-template-columns: auto 1fr; gap: 0.6rem; font-size: 0.85rem; color: var(--fog);
+          padding: 0.5rem 0; border-bottom: 1px solid var(--line-2); }
   .note:last-child { border-bottom: 0; }
-  .note b { color: var(--chalk); font-weight: 500; font-family: var(--mono); font-size: 0.78rem; }
+  .note b { color: var(--chalk); font-family: var(--mono); font-size: 0.76rem; font-weight: 500; }
 
-  .kv { display: flex; gap: 0.6rem; font-size: 0.85rem; padding: 0.3rem 0; }
-  .kv span:first-child { color: var(--fog-dim); min-width: 7rem; font-family: var(--mono); font-size: 0.72rem;
-                          text-transform: uppercase; letter-spacing: 0.1em; padding-top: 0.15rem; }
-  .ok { color: var(--green); }
-  .miss { color: var(--fog-dim); }
+  .kv { display: flex; gap: 0.6rem; font-size: 0.86rem; padding: 0.3rem 0; }
+  .kv span:first-child { color: var(--fog-dim); min-width: 7.5rem; font-family: var(--mono);
+                         font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.1em; padding-top: 0.18rem; }
+  .ok { color: var(--green); } .miss { color: var(--fog-dim); }
 
-  .feed { font-family: var(--mono); font-size: 0.72rem; line-height: 1.7; color: var(--fog);
-          max-height: 11rem; overflow-y: auto; background: var(--ink); padding: 0.6rem 0.7rem;
-          border-left: 2px solid var(--line); }
+  .feed { font-family: var(--mono); font-size: 0.71rem; line-height: 1.7; color: var(--fog);
+          max-height: 11rem; overflow-y: auto; background: rgba(0,0,0,.5); border-radius: 9px;
+          border-left: 2px solid var(--accent); padding: 0.6rem 0.7rem; }
   .feed div { white-space: pre-wrap; word-break: break-word; }
 
-  .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: 1.5rem;
-           background: var(--amber); color: var(--ink); font-family: var(--mono); font-size: 0.78rem;
-           padding: 0.6rem 1.1rem; opacity: 0; pointer-events: none; transition: opacity .18s; }
-  .toast.show { opacity: 1; }
-  .toast.err { background: var(--red); }
+  .toast { position: fixed; left: 50%; bottom: 1.5rem; transform: translateX(-50%) translateY(8px);
+           background: var(--accent); color: #000; font-weight: 600; font-size: 0.82rem;
+           border-radius: 10px; padding: 0.6rem 1.1rem; opacity: 0; pointer-events: none; z-index: 50;
+           transition: opacity .2s var(--ease), transform .2s var(--ease); }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .toast.err { background: var(--red); color: #fff; }
 
   .hint { font-size: 0.8rem; color: var(--fog-dim); margin: 0.6rem 0 0; }
   .sub { font-size: 0.78rem; color: var(--fog-dim); }
   .toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
-  input[type="range"] { width: 100%; accent-color: var(--amber); background: transparent; }
-  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+  input[type="range"] { width: 100%; accent-color: var(--accent); background: transparent; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before { animation: none !important; transition: none !important; }
+  }
 </style>
 </head>
 <body>
+<div class="aurora" aria-hidden="true"><i class="a"></i><i class="b"></i></div>
 <div class="wrap">
   <header>
-    <span class="mark">padctl</span>
+    <svg width="24" height="24" viewBox="0 0 128 128" aria-hidden="true">
+      <rect width="128" height="128" rx="28" fill="#111" />
+      <circle cx="64" cy="36" r="14" fill="#ff7a00" /><circle cx="92" cy="64" r="14" fill="#2e6bff" />
+      <circle cx="64" cy="92" r="14" fill="#2fd07a" /><circle cx="36" cy="64" r="14" fill="#ff3b30" />
+    </svg>
+    <span class="wordmark" role="img" aria-label="L1R1">
+      <span class="wm lit"><i></i><span>L1</span></span>
+      <span class="wm"><i></i><span>R1</span></span>
+    </span>
     <span class="status">
       <span id="conn"><span class="dot" id="dot">&#9679;</span> <span id="conn-text">connecting</span></span>
       <span id="dirty">saved</span>
@@ -140,6 +216,12 @@
   </header>
 
   <div class="cols">
+    <aside class="rail">
+      <h2>Profiles</h2>
+      <div id="rail-list"></div>
+      <p class="hint" id="rail-note"></p>
+    </aside>
+
     <div>
       <div class="tabs" role="tablist">
         <button role="tab" data-table="bindings" aria-selected="true">Base</button>
@@ -188,7 +270,7 @@
         <div class="row" style="margin-top: 1rem;">
           <button class="act primary" id="save" disabled>Save</button>
           <button class="act" id="revert" disabled>Revert</button>
-          <button class="act" id="unbind">Unbind</button>
+          <button class="act quiet" id="unbind">Unbind</button>
         </div>
       </div>
 
@@ -286,7 +368,8 @@ const EXTRA = [
   "swipe_left_x2", "swipe_right_x2", "swipe_up_x2", "swipe_down_x2"
 ];
 
-const state = { config: null, table: "bindings", sel: null, dirty: false, capturing: false };
+const state = { config: null, scope: "global", table: "bindings", sel: null,
+                dirty: false, capturing: false, active: null, detected: null };
 
 const $ = (id) => document.getElementById(id);
 
@@ -307,6 +390,11 @@ function keyLabel(action) {
 
 function summarise(action) {
   if (!action) return null;
+  if (action.tap || action.hold) {
+    const t = summarise(action.tap);
+    const h = typeof action.hold === "string" ? action.hold.replace("__", "") : summarise(action.hold);
+    return (t ?? "nothing") + " / hold: " + (h ?? "nothing");
+  }
   switch (action.type) {
     case "hotkey": return keyLabel(action);
     case "click": return "Click " + (action.button || "left");
@@ -319,7 +407,13 @@ function summarise(action) {
   }
 }
 
-function table() { return state.config?.[state.table] ?? {}; }
+// "global" edits the top-level tables; a profile key edits that profile's own.
+function table() {
+  if (state.scope === "global") return state.config?.[state.table] ?? {};
+  return state.config?.profiles?.[state.scope]?.[state.table] ?? {};
+}
+function globalTable() { return state.config?.[state.table] ?? {}; }
+function profiles() { return state.config?.profiles ?? {}; }
 
 function markDirty(on) {
   state.dirty = on;
@@ -331,8 +425,11 @@ function markDirty(on) {
 
 function paintPad() {
   const t = table();
+  const g = state.scope === "global" ? {} : globalTable();
   document.querySelectorAll(".ctl").forEach((el) => {
-    el.classList.toggle("bound", Boolean(t[el.dataset.id]));
+    const own = Boolean(t[el.dataset.id]);
+    el.classList.toggle("bound", own);
+    el.classList.toggle("inherited", !own && Boolean(g[el.dataset.id]));
     el.classList.toggle("sel", el.dataset.id === state.sel);
   });
   const box = $("extra-controls");
@@ -343,6 +440,72 @@ function paintPad() {
     b.textContent = LABELS[id] + (t[id] ? " · " + (summarise(t[id]) || "").slice(0, 18) : "");
     b.addEventListener("click", () => select(id));
     box.appendChild(b);
+  });
+}
+
+function renderRail() {
+  const host = $("rail-list");
+  host.innerHTML = "";
+  const items = [["global", "Everywhere", null], ...Object.entries(profiles()).map(([k, p]) => [k, p.label || k, p])];
+
+  items.forEach(([key, label, p]) => {
+    const b = document.createElement("button");
+    b.className = "rail-item" + (p && p.enabled === false ? " off" : "");
+    b.setAttribute("aria-current", String(key === state.scope));
+
+    const sw = document.createElement("span");
+    sw.className = "swatch";
+    sw.style.background = key === "global" ? "var(--fog-dim)"
+      : { herdr: "var(--green)", lightroom: "var(--blue)" }[key] ?? "var(--orange)";
+
+    const name = document.createElement("span");
+    name.textContent = label;
+
+    b.append(sw, name);
+
+    // A dot for the profile matching whatever app is in front right now.
+    if (p && state.active && state.active.key === key) {
+      const now = document.createElement("span");
+      now.className = "now";
+      now.title = "Active right now";
+      b.appendChild(now);
+    }
+
+    const count = document.createElement("span");
+    count.className = "count";
+    count.textContent = p
+      ? String(Object.keys(p.bindings ?? {}).length + Object.keys(p.l1_bindings ?? {}).length)
+      : String(Object.keys(state.config?.bindings ?? {}).length + Object.keys(state.config?.l1_bindings ?? {}).length);
+    b.appendChild(count);
+
+    b.addEventListener("click", () => {
+      state.scope = key;
+      if (key !== "global" && state.table === "desktop_bindings") state.table = "bindings";
+      renderRail();
+      syncTabs();
+      if (state.sel) select(state.sel); else paintPad();
+    });
+    host.appendChild(b);
+  });
+
+  const p = profiles()[state.scope];
+  $("rail-note").textContent = state.scope === "global"
+    ? "Applies everywhere unless a profile below overrides it."
+    : (p?.requires && !state.detected?.[p.requires]
+        ? `Dormant: ${p.requires} isn't installed.`
+        : `Used when the front app is ${(p?.match ?? []).join(" or ") || "unset"}.`);
+}
+
+// The desktop table only exists globally; a profile is already app-specific.
+function syncTabs() {
+  document.querySelectorAll('[role="tab"]').forEach((b) => {
+    const isDesktop = b.dataset.table === "desktop_bindings";
+    // Legacy table. Shown only for configs that still have one, so old installs
+    // keep access to it and new ones never see a third concept.
+    const legacy = Object.keys(state.config?.desktop_bindings ?? {}).length > 0;
+    b.hidden = isDesktop && (!legacy || state.scope !== "global");
+    if (isDesktop && b.hidden && state.table === "desktop_bindings") state.table = "bindings";
+    b.setAttribute("aria-selected", String(b.dataset.table === state.table));
   });
 }
 
@@ -359,54 +522,93 @@ function field(labelText, node) {
 function select(id) {
   state.sel = id;
   $("sel-name").textContent = LABELS[id] || id;
-  $("sel-id").textContent = id + "  ·  " + { bindings: "base", l1_bindings: "holding L1", desktop_bindings: "outside the terminal" }[state.table];
+  const where = state.scope === "global"
+    ? "Everywhere"
+    : "Only in " + (profiles()[state.scope]?.label ?? state.scope);
+  const layer = { bindings: "", l1_bindings: " · while holding L1",
+                  desktop_bindings: " · outside the terminal" }[state.table];
+  $("sel-id").textContent = where + layer;
   paintPad();
   renderEditor();
 }
 
 function setAction(next) {
-  if (!state.config[state.table]) state.config[state.table] = {};
-  if (next === null) delete state.config[state.table][state.sel];
-  else state.config[state.table][state.sel] = next;
+  let host;
+  if (state.scope === "global") {
+    host = state.config[state.table] ??= {};
+  } else {
+    const p = (state.config.profiles ??= {})[state.scope] ??= { label: state.scope, match: [] };
+    host = p[state.table] ??= {};
+  }
+  if (next === null) delete host[state.sel];
+  else host[state.sel] = next;
   markDirty(true);
   paintPad();
   renderEditor();
 }
 
-function renderEditor() {
-  const host = $("editor");
-  host.innerHTML = "";
-  if (!state.sel) return;
+// One control now answers two questions: what a tap does, and what a hold does.
+// They map onto existing primitives wherever one exists, so the common cases
+// stay cheap: tap-click plus hold-drag is a single `hold` action, and "repeat"
+// is the repeat flag, not a second action.
+const TAP_CHOICES = [
+  ["", "Do nothing"],
+  ["hotkey", "Press a keyboard shortcut"],
+  ["click", "Click the mouse"],
+  ["exec", "Run a command"],
+  ["text", "Type into the terminal"],
+  ["keys", "Send keys to the terminal"],
+  ["workspace", "Switch workspace"],
+];
+const HOLD_CHOICES = [
+  ["", "Nothing"],
+  ["__repeat", "Keep repeating the tap"],
+  ["__drag", "Drag the mouse"],
+  ["hotkey", "Press a keyboard shortcut"],
+  ["click", "Click the mouse"],
+  ["exec", "Run a command"],
+  ["text", "Type into the terminal"],
+  ["keys", "Send keys to the terminal"],
+  ["workspace", "Switch workspace"],
+];
 
-  const current = table()[state.sel] || null;
+const SEED = {
+  hotkey: { type: "hotkey", key: "", modifiers: [] },
+  click: { type: "click", button: "left" },
+  exec: { type: "exec", cmd: "" },
+  keys: { type: "keys", keys: [] },
+  text: { type: "text", text: "" },
+  workspace: { type: "workspace", dir: "next" },
+};
 
-  const sel = document.createElement("select");
-  ["(unbound)", "hotkey", "click", "hold", "exec", "keys", "text", "workspace"].forEach((t) => {
-    const o = document.createElement("option");
-    o.value = t === "(unbound)" ? "" : t;
-    o.textContent = t;
-    if ((current?.type ?? "") === o.value) o.selected = true;
-    sel.appendChild(o);
-  });
-  sel.addEventListener("change", () => {
-    const t = sel.value;
-    if (!t) return setAction(null);
-    const seed = { hotkey: { type: "hotkey", key: "", modifiers: [] }, click: { type: "click", button: "left" },
-      hold: { type: "hold", button: "left" }, exec: { type: "exec", cmd: "" },
-      keys: { type: "keys", keys: [] }, text: { type: "text", text: "" },
-      workspace: { type: "workspace", dir: "next" } }[t];
-    setAction(seed);
-  });
-  host.appendChild(field("Does what", sel));
+/** Split whatever is stored into the two questions the UI asks. */
+function split(a) {
+  if (!a) return { tap: null, hold: "" };
+  if (a.tap || a.hold) return { tap: a.tap ?? null, hold: a.hold ?? "" };
+  if (a.type === "hold") return { tap: { type: "click", button: a.button ?? "left" }, hold: "__drag" };
+  if (a.repeat) { const t = { ...a }; delete t.repeat; return { tap: t, hold: "__repeat" }; }
+  return { tap: a, hold: "" };
+}
 
-  if (!current) return;
+/** And put them back together as the cheapest thing that expresses it. */
+function join(tap, hold) {
+  if (!tap && !hold) return null;
+  if (hold === "__drag") return { type: "hold", button: tap?.button ?? "left" };
+  if (hold === "__repeat") return tap ? { ...tap, repeat: true } : null;
+  if (!hold) return tap;
+  if (!tap) return { hold };
+  return { tap, hold };
+}
 
-  if (current.type === "hotkey") {
+/** Renders the fields a single action needs. */
+function actionFields(host, action, onChange) {
+  if (!action || typeof action !== "object") return;
+
+  if (action.type === "hotkey") {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "capture";
-    const label = keyLabel(current);
-    btn.textContent = label || "Click, then press the keys";
+    btn.textContent = keyLabel(action) || "Click, then press the keys";
     btn.addEventListener("click", () => {
       state.capturing = true;
       btn.classList.add("arm");
@@ -427,70 +629,131 @@ function renderEditor() {
       if (e.altKey) modifiers.push("option");
       if (e.metaKey) modifiers.push("command");
       state.capturing = false;
-      setAction({ ...current, key, modifiers });
+      onChange({ ...action, key, modifiers });
     });
     btn.addEventListener("blur", () => { state.capturing = false; btn.classList.remove("arm"); });
-    host.appendChild(field("Shortcut", btn));
-
-    const rep = document.createElement("select");
-    [["", "no"], ["true", "yes"]].forEach(([v, t]) => {
-      const o = document.createElement("option"); o.value = v; o.textContent = t;
-      if (Boolean(current.repeat) === (v === "true")) o.selected = true;
-      rep.appendChild(o);
-    });
-    rep.addEventListener("change", () => {
-      const next = { ...current };
-      if (rep.value) next.repeat = true; else delete next.repeat;
-      setAction(next);
-    });
-    host.appendChild(field("Repeat while held", rep));
+    host.appendChild(field("Which keys", btn));
   }
 
-  if (current.type === "click" || current.type === "hold") {
-    const s = document.createElement("select");
+  if (action.type === "click") {
+    const sel = document.createElement("select");
     ["left", "right"].forEach((b) => {
-      const o = document.createElement("option"); o.value = b; o.textContent = b;
-      if ((current.button || "left") === b) o.selected = true; s.appendChild(o);
+      const o = document.createElement("option");
+      o.value = b; o.textContent = b;
+      if ((action.button || "left") === b) o.selected = true;
+      sel.appendChild(o);
     });
-    s.addEventListener("change", () => setAction({ ...current, button: s.value }));
-    host.appendChild(field("Button", s));
+    sel.addEventListener("change", () => onChange({ ...action, button: sel.value }));
+    host.appendChild(field("Which mouse button", sel));
   }
 
-  if (current.type === "exec") {
+  if (action.type === "exec") {
     const i = document.createElement("input");
-    i.type = "text"; i.value = current.cmd || ""; i.placeholder = "open -a Spokenly";
-    i.addEventListener("change", () => setAction({ ...current, cmd: i.value }));
-    host.appendChild(field("Shell command", i));
+    i.type = "text"; i.value = action.cmd || ""; i.placeholder = "open -a Spokenly";
+    i.addEventListener("change", () => onChange({ ...action, cmd: i.value }));
+    host.appendChild(field("Command to run", i));
   }
 
-  if (current.type === "keys") {
+  if (action.type === "keys") {
     const i = document.createElement("input");
-    i.type = "text"; i.value = (current.keys || []).join(" "); i.placeholder = "esc  ctrl+w  shift+tab";
-    i.addEventListener("change", () => setAction({ ...current, keys: i.value.split(/\s+/).filter(Boolean) }));
-    host.appendChild(field("Keys, space separated", i));
+    i.type = "text"; i.value = (action.keys || []).join(" "); i.placeholder = "esc  ctrl+w  shift+tab";
+    i.addEventListener("change", () => onChange({ ...action, keys: i.value.split(/\s+/).filter(Boolean) }));
+    host.appendChild(field("Keys to send, space separated", i));
   }
 
-  if (current.type === "text") {
+  if (action.type === "text") {
     const t = document.createElement("textarea");
-    t.value = current.text || ""; t.placeholder = "keep going";
-    t.addEventListener("change", () => setAction({ ...current, text: t.value }));
-    host.appendChild(field("Types this into the pane", t));
+    t.value = action.text || ""; t.placeholder = "keep going";
+    t.addEventListener("change", () => onChange({ ...action, text: t.value }));
+    host.appendChild(field("Text to type", t));
   }
 
-  if (current.type === "workspace") {
-    const s = document.createElement("select");
+  if (action.type === "workspace") {
+    const sel = document.createElement("select");
     ["next", "prev"].forEach((d) => {
-      const o = document.createElement("option"); o.value = d; o.textContent = d;
-      if ((current.dir || "next") === d) o.selected = true; s.appendChild(o);
+      const o = document.createElement("option");
+      o.value = d; o.textContent = d;
+      if ((action.dir || "next") === d) o.selected = true;
+      sel.appendChild(o);
     });
-    s.addEventListener("change", () => setAction({ ...current, dir: s.value }));
-    host.appendChild(field("Direction", s));
+    sel.addEventListener("change", () => onChange({ ...action, dir: sel.value }));
+    host.appendChild(field("Which way", sel));
   }
 
-  if (current.type === "keys" || current.type === "text" || current.type === "workspace") {
+  if (["keys", "text", "workspace"].includes(action.type)) {
     const p = document.createElement("p");
     p.className = "hint";
     p.textContent = "Needs herdr. These reach a terminal pane, not whatever has focus.";
+    host.appendChild(p);
+  }
+}
+
+function renderEditor() {
+  const host = $("editor");
+  host.innerHTML = "";
+  if (!state.sel) return;
+
+  const current = table()[state.sel] || null;
+  const { tap, hold } = split(current);
+
+  if (!current) {
+    const inherited = state.scope !== "global" ? globalTable()[state.sel] : null;
+    if (inherited) {
+      const p = document.createElement("p");
+      p.className = "hint";
+      p.textContent = "Inherited from Everywhere: " + (summarise(inherited) ?? "");
+      host.appendChild(p);
+    }
+  }
+
+  // ---- tap
+  const tapSel = document.createElement("select");
+  TAP_CHOICES.forEach(([v, label]) => {
+    const o = document.createElement("option");
+    o.value = v; o.textContent = label;
+    if ((tap?.type ?? "") === v) o.selected = true;
+    tapSel.appendChild(o);
+  });
+  tapSel.addEventListener("change", () => {
+    const next = tapSel.value ? { ...(SEED[tapSel.value]) } : null;
+    setAction(join(next, hold === "__drag" && tapSel.value !== "click" ? "" : hold));
+  });
+  host.appendChild(field("When you tap it", tapSel));
+  actionFields(host, tap, (updated) => setAction(join(updated, hold)));
+
+  // ---- hold
+  const holdSel = document.createElement("select");
+  HOLD_CHOICES.forEach(([v, label]) => {
+    const o = document.createElement("option");
+    o.value = v; o.textContent = label;
+    // Dragging only means something when the tap is a click.
+    if (v === "__drag" && tap?.type !== "click") return;
+    if (v === "__repeat" && !tap) return;
+    const chosen = typeof hold === "string" ? hold : hold?.type ?? "";
+    if (chosen === v) o.selected = true;
+    holdSel.appendChild(o);
+  });
+  holdSel.addEventListener("change", () => {
+    const v = holdSel.value;
+    const next = v.startsWith("__") || v === "" ? v : { ...(SEED[v]) };
+    setAction(join(tap, next));
+  });
+  const holdField = field("When you hold it", holdSel);
+  holdField.style.borderTop = "1px solid var(--line-2)";
+  holdField.style.paddingTop = "0.9rem";
+  host.appendChild(holdField);
+
+  if (hold && typeof hold === "object") {
+    actionFields(host, hold, (updated) => setAction(join(tap, updated)));
+  } else if (hold === "__repeat") {
+    const p = document.createElement("p");
+    p.className = "hint";
+    p.textContent = "Fires again after 400ms, then every 60ms, like a held key.";
+    host.appendChild(p);
+  } else if (hold === "__drag") {
+    const p = document.createElement("p");
+    p.className = "hint";
+    p.textContent = "The button stays down while held, so moving the stick drags.";
     host.appendChild(p);
   }
 }
@@ -541,6 +804,10 @@ async function load() {
   const r = await fetch("/api/state");
   const s = await r.json();
   state.config = s.config;
+  state.active = s.active_profile ?? null;
+  state.detected = { herdr: Boolean(s.detected?.herdr), lightroom: Boolean(s.detected?.lightroom) };
+  renderRail();
+  syncTabs();
   renderDetected(s.detected, s.shortcuts);
   renderNotes(s.notes);
   markDirty(false);
@@ -569,6 +836,7 @@ $("suggest").addEventListener("click", async () => {
   const out = await r.json();
   if (!r.ok) return toast(out.error || "Could not build one", true);
   state.config = out.config;
+  renderRail();
   renderNotes(out.notes);
   markDirty(true);
   paintPad();
@@ -579,8 +847,9 @@ $("suggest").addEventListener("click", async () => {
 
 document.querySelectorAll('[role="tab"]').forEach((btn) => {
   btn.addEventListener("click", () => {
-    document.querySelectorAll('[role="tab"]').forEach((b) => b.setAttribute("aria-selected", String(b === btn)));
     state.table = btn.dataset.table;
+    document.documentElement.setAttribute("data-table", state.table);
+    syncTabs();
     if (state.sel) select(state.sel); else paintPad();
   });
 });
@@ -720,6 +989,7 @@ if (window.matchMedia("(display-mode: standalone)").matches) {
 }
 
 loadLoginItem();
+document.documentElement.setAttribute("data-table", state.table);
 load();
 </script>
 </body>

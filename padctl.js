@@ -48,6 +48,7 @@ function loadConfig() {
       chords: next.chords ?? {},
       ui: next.ui ?? {},
       behaviour: next.behaviour ?? {},
+      profiles: next.profiles ?? {},
     }
     const n = Object.keys(config.bindings).length + Object.keys(config.l1_bindings).length
     log(`config loaded (${n} bindings)`)
@@ -179,6 +180,11 @@ async function run(action, control, id = control) {
 async function runOnce(action, control, id = control) {
   if (!action) return
   if (DRY) return log(`${control} -> [dry] ${JSON.stringify(action)}`)
+
+  // { tap, hold }: two actions on one button, told apart by how long it's down.
+  // The tap can't fire on press, because at that moment we don't know yet which
+  // one was meant, so it waits for the release instead.
+  if (action.tap || action.hold) return startTapHold(action, control, id)
 
   switch (action.type) {
     case 'exec':
@@ -347,6 +353,32 @@ const CHORD_HOLD_MS = 250
 const pendingSolo = new Map()
 const pressedAt = {}
 
+// A press that hasn't yet decided whether it's a tap or a hold.
+const HOLD_MS = 350
+const pendingTap = new Map()
+
+function startTapHold(action, control, id) {
+  cancelTapHold(id)
+  const entry = { action, control, fired: false }
+  entry.timer = setTimeout(() => {
+    entry.fired = true
+    if (action.hold) runOnce(action.hold, `${control} (hold)`, id)
+  }, action.hold_ms ?? HOLD_MS)
+  pendingTap.set(id, entry)
+}
+
+function cancelTapHold(id) {
+  const e = pendingTap.get(id)
+  if (!e) return null
+  clearTimeout(e.timer)
+  pendingTap.delete(id)
+  return e
+}
+
+function cancelAllTapHolds() {
+  for (const id of [...pendingTap.keys()]) cancelTapHold(id)
+}
+
 // control id -> mouse button currently held down by a `hold` action. Keyed by the
 // button that started it, so the release doesn't care whether the layer or the
 // frontmost app changed while it was down.
@@ -354,6 +386,12 @@ const activeHolds = new Map()
 
 async function releaseButton(id) {
   stopRepeat(id)
+
+  // Let go before the threshold, so it was a tap after all.
+  const tapHold = cancelTapHold(id)
+  if (tapHold && !tapHold.fired && tapHold.action.tap) {
+    await runOnce(tapHold.action.tap, `${tapHold.control} (tap)`, id)
+  }
 
   // A chord participant tapped and let go before its window expired: resolve the
   // solo action now rather than dropping it.
@@ -434,28 +472,60 @@ async function fire(id) {
 async function fireSolo(id) {
   if (id === 'l1') return // L1 is the layer modifier, never an action itself
 
-  // L1 layer wins outright, so the modifier behaves the same everywhere.
+  const front = await frontmostBundle()
+  const profile = profileFor(front)
+
+  // A profile's own L1 layer wins, then the global one, so a profile only has to
+  // describe what it changes rather than restate the whole layer.
   if (l1Held) {
-    if (DEBUG) log(`PRESS ${id} (L1 held)`)
-    return run(config.l1_bindings[id], `L1+${id}`, id)
+    const action = profile?.l1_bindings?.[id] ?? config.l1_bindings[id]
+    const label = profile ? `L1+${id} [${profile.key}]` : `L1+${id}`
+    if (DEBUG) log(`PRESS ${label}`)
+    return run(action, label, id)
   }
 
+  const terminal = config.terminal_bundle ?? 'dev.warp.Warp-Stable'
   const desktop = config.desktop_bindings ?? {}
-  let table = config.bindings
-  let label = id
-  if (Object.keys(desktop).length) {
-    const front = await frontmostBundle()
-    const terminal = config.terminal_bundle ?? 'dev.warp.Warp-Stable'
-    label = `${id} [front=${front ?? 'UNKNOWN'}]`
-    if (front && front !== terminal && desktop[id]) {
-      table = desktop
-      label = `${id} [desktop:${front}]`
-    }
+
+  // Most specific first: the profile for the app in front, then the legacy
+  // desktop table, then the base table.
+  let action = profile?.bindings?.[id]
+  let label = profile ? `${id} [${profile.key}]` : null
+
+  if (action === undefined && front && front !== terminal && desktop[id]) {
+    action = desktop[id]
+    label = `${id} [desktop:${front}]`
+  }
+  if (action === undefined) {
+    action = config.bindings[id]
+    label = label ?? `${id} [front=${front ?? 'UNKNOWN'}]`
   }
 
   if (DEBUG) log(`PRESS ${label}`)
-  run(table[id], label, id)
+  run(action, label, id)
 }
+
+// Which profile owns the app currently in front. `requires` keeps a profile
+// dormant until its tool is installed, so an uninstalled herdr can't swallow
+// every binding in the terminal.
+function profileFor(front) {
+  if (!front) return null
+  for (const [key, p] of Object.entries(config.profiles ?? {})) {
+    if (p.enabled === false) continue
+    if (p.requires === 'herdr' && !herdrPresent) continue
+    const match = Array.isArray(p.match) ? p.match : [p.match].filter(Boolean)
+    if (match.includes(front)) return { ...p, key }
+  }
+  return null
+}
+
+// Resolved once at startup: `requires` is about what's installed, not what's
+// running, so re-checking on every press would be pure waste.
+let herdrPresent = false
+require('./lib/detect')
+  .detect()
+  .then((d) => { herdrPresent = Boolean(d.herdr) })
+  .catch(() => {})
 
 // ---------------------------------------------------------------- decoding
 
@@ -653,8 +723,8 @@ function connect() {
   log('controller connected')
   if (config.behaviour?.on_connect) run(config.behaviour.on_connect, 'on connect')
   device.on('data', handleReport)
-  device.on('error', () => {
-    log('controller disconnected')
+  device.on('error', (err) => {
+    log(`controller disconnected${err ? `: ${String(err.message ?? err).split('\n')[0]}` : ''}`)
     try {
       device.close()
     } catch {}
@@ -663,6 +733,7 @@ function connect() {
     l1Held = false
     releaseAllHolds() // a pad that dies mid-drag must not leave the mouse stuck down
     stopAllRepeats()
+    cancelAllTapHolds()
     log('controller disconnected')
     if (config.behaviour?.on_disconnect) run(config.behaviour.on_disconnect, 'on disconnect')
   })
@@ -695,6 +766,7 @@ function checkPermissions() {
 for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
   process.on(sig, () => {
     stopAllRepeats()
+    cancelAllTapHolds()
     releaseAllHolds()
     // The helper needs a tick to flush the up event before we take it down.
     setTimeout(() => process.exit(0), 60)
@@ -721,6 +793,7 @@ if (config.ui?.enabled !== false && !DRY) {
     configPath: CONFIG_PATH,
     getConfig: () => config,
     controls: CONTROLS,
+    profileFor: () => frontmostBundle().then((f) => profileFor(f)),
     actionTypes: ['hotkey', 'click', 'hold', 'exec', 'keys', 'text', 'workspace'],
     loginItem: require('./lib/login-item'),
     log,

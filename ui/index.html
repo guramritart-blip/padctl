@@ -403,6 +403,7 @@ function summarise(action) {
     case "keys": return (action.keys || []).join(" ") + " → terminal pane";
     case "text": return "“" + String(action.text || "").slice(0, 40) + "”";
     case "workspace": return "Workspace " + (action.dir || "next");
+    case "agent": return "Agent " + (action.dir || "next");
     default: return action.type;
   }
 }
@@ -559,6 +560,7 @@ const TAP_CHOICES = [
   ["text", "Type into the terminal"],
   ["keys", "Send keys to the terminal"],
   ["workspace", "Switch workspace"],
+  ["agent", "Switch agent"],
 ];
 const HOLD_CHOICES = [
   ["", "Nothing"],
@@ -570,6 +572,7 @@ const HOLD_CHOICES = [
   ["text", "Type into the terminal"],
   ["keys", "Send keys to the terminal"],
   ["workspace", "Switch workspace"],
+  ["agent", "Switch agent"],
 ];
 
 const SEED = {
@@ -579,6 +582,7 @@ const SEED = {
   keys: { type: "keys", keys: [] },
   text: { type: "text", text: "" },
   workspace: { type: "workspace", dir: "next" },
+  agent: { type: "agent", dir: "next" },
 };
 
 /** Split whatever is stored into the two questions the UI asks. */
@@ -668,7 +672,7 @@ function actionFields(host, action, onChange) {
     host.appendChild(field("Text to type", t));
   }
 
-  if (action.type === "workspace") {
+  if (action.type === "workspace" || action.type === "agent") {
     const sel = document.createElement("select");
     ["next", "prev"].forEach((d) => {
       const o = document.createElement("option");
@@ -680,7 +684,7 @@ function actionFields(host, action, onChange) {
     host.appendChild(field("Which way", sel));
   }
 
-  if (["keys", "text", "workspace"].includes(action.type)) {
+  if (["keys", "text", "workspace", "agent"].includes(action.type)) {
     const p = document.createElement("p");
     p.className = "hint";
     p.textContent = "Needs herdr. These reach a terminal pane, not whatever has focus.";

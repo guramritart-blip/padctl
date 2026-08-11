@@ -5,6 +5,7 @@
     "keys": "{ type: keys, keys: [enter, ctrl+u, shift+tab, esc, up, ...] } -> focused pane",
     "text": "{ type: text, text: <string>, submit: true|false } -> focused pane",
     "workspace": "{ type: workspace, dir: next|prev }",
+    "agent": "{ type: agent, dir: next|prev }  cycles agent panes only, skipping workspaces that have none",
     "hotkey": "{ type: hotkey, key: enter|escape|<code>, modifiers: [command,shift,option,control] } -> SYSTEM-WIDE, works in any app",
     "hold": "{ type: hold, button: left|right } -> SYSTEM-WIDE. Down on press, up on release: tap = click, keep held = drag.",
     "_repeat": "Add \"repeat\": true to any action to make holding the button fire it again, like a held keyboard key. Tune with repeat_delay_ms (default 400) and repeat_ms (default 60)."
@@ -58,7 +59,7 @@
       ]
     },
     "l2": {
-      "type": "workspace",
+      "type": "agent",
       "dir": "next"
     },
     "r2": {

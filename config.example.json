@@ -5,6 +5,7 @@
     "keys": "{ type: keys, keys: [enter, ctrl+u, shift+tab, esc, up, ...] } -> focused herdr pane, NOT system-wide",
     "text": "{ type: text, text: <string>, submit: true|false } -> focused herdr pane",
     "workspace": "{ type: workspace, dir: next|prev } -> herdr workspaces",
+    "agent": "{ type: agent, dir: next|prev } -> herdr agent panes only, skipping workspaces that have none",
     "hotkey": "{ type: hotkey, key: enter|escape|a-z|0-9|<code>, modifiers: [command,shift,option,control] } -> SYSTEM-WIDE, works in any app",
     "click": "{ type: click, button: left|right } -> SYSTEM-WIDE click",
     "hold": "{ type: hold, button: left|right } -> SYSTEM-WIDE. Down on press, up on release: tap = click, keep held = drag."

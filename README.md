@@ -133,8 +133,9 @@ L1 is the layer modifier and can never be bound itself.
 | `keys` | herdr pane only | Sends keystrokes to the focused agent pane |
 | `text` | herdr pane only | Types a string, optionally submits |
 | `workspace` | herdr only | `{dir: next\|prev}` |
+| `agent` | herdr only | `{dir: next\|prev}`. Cycles agent panes only — several in one workspace are all separate stops, and workspaces with no agent are skipped. |
 
-`keys`, `text` and `workspace` need herdr. Without it, use `hotkey` and `exec`.
+`keys`, `text`, `workspace` and `agent` need herdr. Without it, use `hotkey` and `exec`.
 That's the whole reason `desktop_bindings` exists: `keys` can't leave the
 terminal, `hotkey` can.
 

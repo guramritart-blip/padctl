@@ -107,6 +107,54 @@ async function switchWorkspace(dir) {
   log(`workspace -> ${next.number}. ${next.label}`)
 }
 
+// Workspaces are the wrong ring when what you actually want is the next agent:
+// a workspace can hold several, and plenty hold none at all. This walks only
+// panes herdr has identified as agents, so every press lands on one.
+function paneNumber(id) {
+  const m = /:p(\d+)$/.exec(id ?? '')
+  return m ? Number(m[1]) : 0
+}
+
+async function switchAgent(dir) {
+  // `agent list` has no display index the way workspaces do, so borrow theirs:
+  // workspace order first, pane order within it. That matches the on-screen
+  // layout, which is the order the press is expected to follow.
+  const [agentRes, wsRes] = await Promise.all([
+    herdr(['agent', 'list']),
+    herdr(['workspace', 'list']),
+  ])
+  const agents = agentRes?.agents
+  if (!agents?.length) return log('agent: none running')
+
+  const number = new Map((wsRes?.workspaces ?? []).map((w) => [w.workspace_id, w.number]))
+  const at = (a) => number.get(a.workspace_id) ?? 0
+  const sorted = [...agents].sort(
+    (a, b) => at(a) - at(b) || paneNumber(a.pane_id) - paneNumber(b.pane_id)
+  )
+
+  const step = dir === 'prev' ? -1 : 1
+  const cur = sorted.findIndex((a) => a.focused)
+
+  let next
+  if (cur !== -1) {
+    next = sorted[(cur + step + sorted.length) % sorted.length]
+  } else {
+    // Focus is on something that isn't an agent — a plain shell, or a workspace
+    // with none. Enter the ring at the nearest agent in the direction of travel
+    // rather than teleporting to the first one.
+    const here = (wsRes?.workspaces ?? []).find((w) => w.focused)?.number ?? 0
+    next =
+      step === 1
+        ? (sorted.find((a) => at(a) >= here) ?? sorted[0])
+        : ([...sorted].reverse().find((a) => at(a) <= here) ?? sorted[sorted.length - 1])
+  }
+
+  if (next.focused) return log('agent: only one running')
+  await herdr(['agent', 'focus', next.pane_id])
+  const title = next.terminal_title_stripped || next.pane_id
+  log(`agent -> ${title} (${next.agent_status})`)
+}
+
 // ---------------------------------------------------------------- actions
 
 // macOS virtual key codes, for the `hotkey` action. A raw number also works.
@@ -213,6 +261,10 @@ async function runOnce(action, control, id = control) {
 
     case 'workspace':
       await switchWorkspace(action.dir)
+      break
+
+    case 'agent':
+      await switchAgent(action.dir)
       break
 
     // Unlike `keys` (which targets a herdr pane, so Claude Code only), this
@@ -794,7 +846,7 @@ if (config.ui?.enabled !== false && !DRY) {
     getConfig: () => config,
     controls: CONTROLS,
     profileFor: () => frontmostBundle().then((f) => profileFor(f)),
-    actionTypes: ['hotkey', 'click', 'hold', 'exec', 'keys', 'text', 'workspace'],
+    actionTypes: ['hotkey', 'click', 'hold', 'exec', 'keys', 'text', 'workspace', 'agent'],
     loginItem: require('./lib/login-item'),
     log,
   })

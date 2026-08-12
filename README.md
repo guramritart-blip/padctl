@@ -14,8 +14,9 @@ cd ~/padctl
 ./install.sh
 ```
 
-Then grant two permissions, described below. That step is not optional and the
-failure mode is silent, so do it before deciding something is broken.
+Two permissions are needed. The daemon asks macOS for them a few seconds after
+it starts, so you should get the real system dialogs and System Settings opened
+at the right pane without looking anything up.
 
 Requires macOS, node, and `swiftc` (`xcode-select --install`).
 
@@ -26,15 +27,34 @@ macOS grants Accessibility to an **exact binary path**, not to a program. So:
 - `install.sh` copies node into `~/padctl/bin/node` and points launchd at that
   copy. If it pointed at `/opt/homebrew/bin/node`, a `brew upgrade node` would
   silently revoke the grant and every hotkey would stop working with no error.
-- You must grant **Accessibility** and **Input Monitoring** to
+- **Accessibility** and **Input Monitoring** both have to land on
   `~/padctl/bin/node` specifically.
 
-System Settings > Privacy & Security. Add it with `+`, using Cmd+Shift+G in the
-file picker to paste the path.
+You shouldn't have to do that by hand. The daemon spawns `permissions request`
+at startup, which raises the real macOS dialogs and opens the two panes. Once
+you flip the switches it notices within about three seconds and restarts itself,
+so there is no `kickstart` step to remember.
+
+Two things that catch people when doing it manually anyway:
+
+- It's **Privacy & Security > Accessibility**, not the Accessibility pane in the
+  sidebar. macOS has two unrelated things by that name and only one of them
+  grants anything.
+- Adding a binary with `+` does not always switch it **on**. Check the toggle.
 
 `padctl.log` prints `accessibility OK` at startup, or a loud banner if not.
 Buttons that only move the mouse will work regardless, which is exactly what
 makes this confusing: **half of it working is the symptom.**
+
+### Why the installer doesn't ask
+
+macOS attributes a permission request to the *responsible* process, which is the
+top-level app rather than whichever binary made the call. Ask from `install.sh`
+and the responsible process is Terminal or Warp, so macOS grants **that** and
+leaves the daemon exactly as broken while appearing to have worked. Under
+launchd there is no terminal in the chain, so the request lands on
+`~/padctl/bin/node` where it belongs. That is the entire reason the asking lives
+in the daemon and the installer only waits for the verdict.
 
 ## The configurator
 

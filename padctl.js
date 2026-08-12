@@ -797,7 +797,33 @@ setInterval(connect, 2000)
 // node at ~/padctl/bin/node precisely so a `brew upgrade node` can't move it out
 // from under the grant. This probe turns the silent-failure case (hotkeys dead,
 // buttons fine) into an obvious line in the log.
-function checkPermissions() {
+// The permission helper runs as a child of THIS process on purpose. macOS
+// attributes a request to the responsible process, so asking from here puts the
+// grant on bin/node — the binary the LaunchAgent actually runs. install.sh
+// cannot do this: from a terminal, the responsible process is Warp or
+// Terminal.app, and macOS would cheerfully grant that instead.
+const PERMISSIONS_PATH = path.join(__dirname, 'permissions')
+
+function readPermissions(mode) {
+  return new Promise((resolve) => {
+    execFile(PERMISSIONS_PATH, [mode], { timeout: 20000 }, (err, stdout) => {
+      // A non-zero exit is the helper saying "not granted", which is an answer
+      // rather than a failure. Only an empty read means it couldn't run.
+      const out = String(stdout ?? '').trim()
+      if (!out) return resolve(null)
+      const state = Object.fromEntries(out.split('\n').map((l) => l.split('=')))
+      resolve({
+        accessibility: state.accessibility === 'granted',
+        inputMonitoring: state.input_monitoring === 'granted',
+      })
+    })
+  })
+}
+
+// For a checkout that pulled a new padctl.js without re-running install.sh, so
+// the helper binary doesn't exist yet. Can only see Accessibility, which is the
+// one that fails silently and therefore the one worth shouting about.
+function legacyCheckPermissions() {
   exec(
     `osascript -e 'tell application "System Events" to name of first process whose frontmost is true'`,
     { timeout: 5000 },
@@ -807,22 +833,71 @@ function checkPermissions() {
       log('ACCESSIBILITY DENIED — buttons will work but hotkeys will NOT.')
       log(`Grant this exact binary in System Settings > Privacy > Accessibility:`)
       log(`  ${process.execPath}`)
+      log('Re-run install.sh to get the prompt that does this for you.')
       log('!'.repeat(60))
     }
   )
 }
 
+async function checkPermissions() {
+  if (!fs.existsSync(PERMISSIONS_PATH)) return legacyCheckPermissions()
+
+  let state = await readPermissions('check')
+  if (!state) return legacyCheckPermissions()
+  if (state.accessibility && state.inputMonitoring) return log('accessibility OK')
+
+  log('!'.repeat(60))
+  log('PERMISSIONS MISSING — asking macOS for them now.')
+  state = (await readPermissions('request')) ?? state
+  if (state.accessibility && state.inputMonitoring) {
+    log('permissions granted')
+    log('!'.repeat(60))
+    return
+  }
+
+  log(`  Accessibility     ${state.accessibility ? 'OK' : 'NEEDED — hotkeys silently do nothing'}`)
+  log(`  Input Monitoring  ${state.inputMonitoring ? 'OK' : 'NEEDED — the pad cannot be read'}`)
+  log('System Settings is open at the right pane. Add this exact binary with')
+  log('the "+" button (Cmd+Shift+G to paste a path), then switch it ON:')
+  log(`  ${process.execPath}`)
+  log('No need to restart anything — this picks it up by itself.')
+  log('!'.repeat(60))
+  waitForPermissions()
+}
+
+// Granting doesn't reach back into a process that already started. node-hid is
+// holding a device handle opened before Input Monitoring existed and that
+// handle never gains the right. So watch, and bounce ourselves the moment both
+// land: KeepAlive means launchd brings us straight back, now trusted.
+let permissionWatch = null
+function waitForPermissions(deadline = Date.now() + 10 * 60 * 1000) {
+  clearTimeout(permissionWatch)
+  permissionWatch = setTimeout(async () => {
+    const state = await readPermissions('check')
+    if (state?.accessibility && state?.inputMonitoring) {
+      log('permissions granted, restarting to pick them up')
+      return shutdown()
+    }
+    if (Date.now() < deadline) return waitForPermissions(deadline)
+    log('permissions still missing after 10 minutes, no longer watching.')
+    log(`Grant them, then: launchctl kickstart -k gui/$(id -u)/com.g.padctl`)
+  }, 3000)
+  permissionWatch.unref?.()
+}
+
 // launchd restarts, a manual kill and a crash-loop all land mid-drag sooner or
 // later. Nothing else would ever lift the button, and a mouse stuck down system
 // wide is the worst failure this program can cause, so exit through here.
+function shutdown() {
+  stopAllRepeats()
+  cancelAllTapHolds()
+  releaseAllHolds()
+  // The helper needs a tick to flush the up event before we take it down.
+  setTimeout(() => process.exit(0), 60)
+}
+
 for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
-  process.on(sig, () => {
-    stopAllRepeats()
-    cancelAllTapHolds()
-    releaseAllHolds()
-    // The helper needs a tick to flush the up event before we take it down.
-    setTimeout(() => process.exit(0), 60)
-  })
+  process.on(sig, shutdown)
 }
 
 loadConfig()

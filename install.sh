@@ -50,7 +50,7 @@ if [ "$PADCTL" != "$SRC" ]; then
   # this is, and a fresh install should start from the example rather than
   # inherit someone else's bindings, half of which reference tools you may
   # not have.
-  for f in padctl.js mousehelper.swift package.json package-lock.json \
+  for f in padctl.js mousehelper.swift permissions.swift package.json package-lock.json \
            com.g.padctl.plist.template config.example.json README.md LICENSE; do
     [ -f "$SRC/$f" ] && cp "$SRC/$f" "$PADCTL/$f"
   done
@@ -101,6 +101,11 @@ pkill -f "$PADCTL/mousehelper" 2>/dev/null || true
 sleep 1
 swiftc -O -o "$PADCTL/mousehelper" "$PADCTL/mousehelper.swift"
 
+# The daemon spawns this to raise the real macOS permission dialogs. See the
+# header of permissions.swift for why it can't be run from here.
+say "Building the permission helper"
+swiftc -O -o "$PADCTL/permissions" "$PADCTL/permissions.swift"
+
 # ---------------------------------------------------------------- config
 # Built for this machine rather than copied: it reads your real screenshot,
 # spaces and Mission Control shortcuts out of your own settings, and only binds
@@ -118,31 +123,71 @@ say "Writing the LaunchAgent"
 mkdir -p "$HOME/Library/LaunchAgents"
 sed -e "s|__PADCTL__|$PADCTL|g" -e "s|__HOME__|$HOME|g" \
   "$PADCTL/com.g.padctl.plist.template" > "$PLIST"
+
+# The log is appended across runs, so remember where this run starts. Otherwise
+# an "accessibility OK" from last week counts as today's verdict.
+LOG="$PADCTL/padctl.log"
+LOG_MARK=1
+[ -f "$LOG" ] && LOG_MARK=$(( $(wc -c < "$LOG") + 1 ))
+
 launchctl bootstrap "gui/$(id -u)" "$PLIST"
 echo "  loaded $LABEL"
 
 # ---------------------------------------------------------------- permissions
-cat <<EOF
+# Deliberately not asked for from this script. macOS grants to the *responsible*
+# process, which from a shell is Terminal or Warp — it would grant that and
+# leave the daemon broken. The daemon asks for itself a few seconds after it
+# starts, so all this does is wait for the answer.
+say "Permissions"
+echo "  The daemon is asking macOS now. Approve the dialogs if they appear."
+echo "  (If you've already granted these, this passes straight through.)"
 
-$(printf '\033[1mAlmost done. Two permissions, granted to this exact binary:\033[0m')
+verdict=""
+for _ in $(seq 1 90); do
+  tail -c "+$LOG_MARK" "$LOG" 2>/dev/null > /tmp/padctl-install-tail.$$ || true
+  if grep -q "accessibility OK\|^\[.*\] permissions granted" /tmp/padctl-install-tail.$$ 2>/dev/null; then
+    verdict=granted; break
+  fi
+  if grep -q "PERMISSIONS MISSING" /tmp/padctl-install-tail.$$ 2>/dev/null; then
+    verdict=asked
+  fi
+  sleep 1
+done
+rm -f /tmp/padctl-install-tail.$$
+
+if [ "$verdict" = "granted" ]; then
+  printf '  \033[1mBoth granted.\033[0m\n'
+else
+  cat <<EOF
+
+$(printf '\033[1mStill waiting on two permissions, for this exact binary:\033[0m')
 
   $PADCTL/bin/node
 
-System Settings > Privacy & Security >
-  - Accessibility       (required, or hotkeys silently do nothing)
-  - Input Monitoring    (required to read the controller)
+System Settings should already be open at the right pane. If not:
 
-Add the binary with the + button. Cmd+Shift+G in the file picker, then paste
-the path above. After granting, restart it:
+  open "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
+  open "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent"
 
-  launchctl kickstart -k gui/$(id -u)/$LABEL
+Note this is Privacy & Security > Accessibility, NOT the Accessibility pane in
+the sidebar — macOS has two things by that name and only this one grants.
 
-Then pair the DualSense over Bluetooth (hold PS + Create until the bar flashes)
-and watch it come up:
+Add the binary with the "+" button (Cmd+Shift+G in the picker, paste the path
+above), then make sure the toggle is ON. Adding it does not always enable it.
 
-  tail -f $PADCTL/padctl.log
+The daemon is watching and restarts itself the moment both land, so there is
+nothing to run afterwards.
+EOF
+fi
 
-You want to see "controller connected" and "accessibility OK".
+cat <<EOF
+
+Pair the DualSense over Bluetooth (hold PS + Create until the bar flashes) and
+watch it come up:
+
+  tail -f $LOG
+
+You want "controller connected" and "accessibility OK".
 
 The configurator is at http://127.0.0.1:7757 — press a button on the pad and it
 selects there. Reopen it any time with:

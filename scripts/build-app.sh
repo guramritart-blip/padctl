@@ -43,6 +43,9 @@ chmod 755 "$RUNTIME/bin/node"
 say "Building mousehelper"
 swiftc -O -o "$RUNTIME/mousehelper" "$ROOT/mousehelper.swift"
 
+say "Building the permission helper"
+swiftc -O -o "$RUNTIME/permissions" "$ROOT/permissions.swift"
+
 # A bundled app writes its config next to itself, not into the repo.
 [ -f "$RUNTIME/config.json" ] || cp "$RUNTIME/config.example.json" "$RUNTIME/config.json"
 

@@ -9,6 +9,9 @@ bin/
 # Compiled from mousehelper.swift at install time.
 mousehelper
 
+# Compiled from permissions.swift at install time.
+permissions
+
 padctl.log
 .DS_Store
 
